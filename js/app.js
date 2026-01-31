@@ -1,0 +1,1566 @@
+// Mindmap Application
+// Main application logic for the mindmap canvas
+
+class MindmapApp {
+    constructor() {
+        this.canvas = document.getElementById('mindmapCanvas');
+        this.ctx = this.canvas.getContext('2d');
+
+        // State
+        this.elements = [];
+        this.selectedElements = [];
+        this.currentTool = 'select';
+        this.isDrawing = false;
+        this.isDragging = false;
+        this.isResizing = false;
+        this.isPanning = false;
+        this.drawStart = { x: 0, y: 0 };
+        this.dragOffset = { x: 0, y: 0 };
+        this.resizeHandle = null;
+
+        // Pan and Zoom
+        this.panOffset = { x: 0, y: 0 };
+        this.zoom = 1;
+
+        // Drawing settings
+        this.fillColor = '#4a90d9';
+        this.strokeColor = '#2c5282';
+        this.strokeWidth = 2;
+        this.fontSize = 14;
+
+        // Clipboard
+        this.clipboard = [];
+
+        // History for undo/redo
+        this.history = [];
+        this.historyIndex = -1;
+        this.maxHistory = 50;
+
+        // Temp drawing element
+        this.tempElement = null;
+
+        // Connection drawing
+        this.connectionStart = null;
+
+        // Initialize
+        this.init();
+    }
+
+    init() {
+        this.setupCanvas();
+        this.setupEventListeners();
+        this.setupToolbar();
+        this.setupPropertyPanel();
+        this.setupModals();
+        this.setupAuth();
+        this.saveState();
+        this.render();
+    }
+
+    setupCanvas() {
+        this.resizeCanvas();
+        window.addEventListener('resize', () => this.resizeCanvas());
+    }
+
+    resizeCanvas() {
+        const container = document.getElementById('canvasContainer');
+        this.canvas.width = container.clientWidth;
+        this.canvas.height = container.clientHeight;
+        this.render();
+    }
+
+    // Event Listeners
+    setupEventListeners() {
+        // Mouse events
+        this.canvas.addEventListener('mousedown', (e) => this.handleMouseDown(e));
+        this.canvas.addEventListener('mousemove', (e) => this.handleMouseMove(e));
+        this.canvas.addEventListener('mouseup', (e) => this.handleMouseUp(e));
+        this.canvas.addEventListener('dblclick', (e) => this.handleDoubleClick(e));
+        this.canvas.addEventListener('wheel', (e) => this.handleWheel(e));
+        this.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+        // Keyboard events
+        document.addEventListener('keydown', (e) => this.handleKeyDown(e));
+
+        // Paste event for images
+        document.addEventListener('paste', (e) => this.handlePaste(e));
+
+        // Prevent default drag behavior
+        this.canvas.addEventListener('dragover', (e) => e.preventDefault());
+        this.canvas.addEventListener('drop', (e) => this.handleDrop(e));
+    }
+
+    // Mouse Handlers
+    handleMouseDown(e) {
+        const pos = this.getMousePos(e);
+
+        // Middle mouse or space+click for panning
+        if (e.button === 1 || (e.button === 0 && e.shiftKey)) {
+            this.isPanning = true;
+            this.panStart = { x: e.clientX, y: e.clientY };
+            this.canvas.style.cursor = 'grabbing';
+            return;
+        }
+
+        if (e.button !== 0) return;
+
+        if (this.currentTool === 'select') {
+            this.handleSelectMouseDown(pos, e);
+        } else {
+            this.handleDrawMouseDown(pos);
+        }
+    }
+
+    handleSelectMouseDown(pos, e) {
+        // Check for resize handles on selected elements
+        const handle = this.getResizeHandle(pos);
+        if (handle) {
+            this.isResizing = true;
+            this.resizeHandle = handle;
+            return;
+        }
+
+        // Check if clicking on an element
+        const clickedElement = this.getElementAtPosition(pos);
+
+        if (clickedElement) {
+            if (e.ctrlKey || e.metaKey) {
+                // Toggle selection
+                const idx = this.selectedElements.indexOf(clickedElement);
+                if (idx > -1) {
+                    this.selectedElements.splice(idx, 1);
+                } else {
+                    this.selectedElements.push(clickedElement);
+                }
+            } else if (!this.selectedElements.includes(clickedElement)) {
+                this.selectedElements = [clickedElement];
+            }
+
+            // Start dragging
+            this.isDragging = true;
+            this.dragOffset = {
+                x: pos.x,
+                y: pos.y
+            };
+            this.dragStartPositions = this.selectedElements.map(el => ({
+                element: el,
+                x: el.x,
+                y: el.y,
+                x2: el.x2,
+                y2: el.y2
+            }));
+        } else {
+            // Start selection box
+            if (!e.ctrlKey && !e.metaKey) {
+                this.selectedElements = [];
+            }
+            this.isDrawing = true;
+            this.drawStart = pos;
+        }
+
+        this.updatePropertyPanel();
+        this.render();
+    }
+
+    handleDrawMouseDown(pos) {
+        this.isDrawing = true;
+        this.drawStart = pos;
+
+        // Create temporary element
+        this.tempElement = this.createElement(this.currentTool, pos.x, pos.y, pos.x, pos.y);
+    }
+
+    handleMouseMove(e) {
+        const pos = this.getMousePos(e);
+
+        if (this.isPanning) {
+            const dx = e.clientX - this.panStart.x;
+            const dy = e.clientY - this.panStart.y;
+            this.panOffset.x += dx;
+            this.panOffset.y += dy;
+            this.panStart = { x: e.clientX, y: e.clientY };
+            this.render();
+            return;
+        }
+
+        if (this.isResizing && this.resizeHandle) {
+            this.handleResize(pos);
+            this.render();
+            return;
+        }
+
+        if (this.isDragging) {
+            const dx = pos.x - this.dragOffset.x;
+            const dy = pos.y - this.dragOffset.y;
+
+            this.dragStartPositions.forEach(({ element, x, y, x2, y2 }) => {
+                element.x = x + dx;
+                element.y = y + dy;
+                if (element.x2 !== undefined) {
+                    element.x2 = x2 + dx;
+                    element.y2 = y2 + dy;
+                }
+            });
+
+            this.render();
+            return;
+        }
+
+        if (this.isDrawing) {
+            if (this.currentTool === 'select') {
+                // Selection box
+                this.render();
+                this.drawSelectionBox(this.drawStart, pos);
+            } else if (this.tempElement) {
+                // Update temp element
+                this.updateTempElement(pos);
+                this.render();
+                this.drawElement(this.tempElement);
+            }
+            return;
+        }
+
+        // Update cursor based on hover
+        this.updateCursor(pos);
+    }
+
+    handleMouseUp(e) {
+        const pos = this.getMousePos(e);
+
+        if (this.isPanning) {
+            this.isPanning = false;
+            this.canvas.style.cursor = 'crosshair';
+            return;
+        }
+
+        if (this.isResizing) {
+            this.isResizing = false;
+            this.resizeHandle = null;
+            this.saveState();
+            return;
+        }
+
+        if (this.isDragging) {
+            this.isDragging = false;
+            this.saveState();
+            return;
+        }
+
+        if (this.isDrawing) {
+            this.isDrawing = false;
+
+            if (this.currentTool === 'select') {
+                // Complete selection box
+                this.selectElementsInBox(this.drawStart, pos);
+            } else if (this.tempElement) {
+                // Finalize element
+                this.finalizeElement(pos);
+            }
+        }
+
+        this.render();
+    }
+
+    handleDoubleClick(e) {
+        const pos = this.getMousePos(e);
+        const element = this.getElementAtPosition(pos);
+
+        if (element) {
+            this.editElementText(element);
+        } else if (this.currentTool === 'select') {
+            // Create text element on double click
+            const textElement = this.createElement('text', pos.x, pos.y, pos.x + 100, pos.y + 30);
+            this.elements.push(textElement);
+            this.selectedElements = [textElement];
+            this.saveState();
+            this.editElementText(textElement);
+        }
+    }
+
+    handleWheel(e) {
+        e.preventDefault();
+        const delta = e.deltaY > 0 ? 0.9 : 1.1;
+        const newZoom = Math.max(0.1, Math.min(5, this.zoom * delta));
+
+        // Zoom towards mouse position
+        const mouseX = e.clientX - this.canvas.getBoundingClientRect().left;
+        const mouseY = e.clientY - this.canvas.getBoundingClientRect().top;
+
+        this.panOffset.x = mouseX - (mouseX - this.panOffset.x) * (newZoom / this.zoom);
+        this.panOffset.y = mouseY - (mouseY - this.panOffset.y) * (newZoom / this.zoom);
+
+        this.zoom = newZoom;
+        this.render();
+    }
+
+    // Keyboard Handler
+    handleKeyDown(e) {
+        // Don't handle if typing in input
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+            return;
+        }
+
+        const key = e.key.toLowerCase();
+
+        // Tool shortcuts
+        if (!e.ctrlKey && !e.metaKey) {
+            switch (key) {
+                case 'v':
+                    this.setTool('select');
+                    return;
+                case 'r':
+                    this.setTool('rect');
+                    return;
+                case 'c':
+                    this.setTool('circle');
+                    return;
+                case 'd':
+                    this.setTool('diamond');
+                    return;
+                case 't':
+                    this.setTool('triangle');
+                    return;
+                case 'a':
+                    this.setTool('arrow');
+                    return;
+                case 'l':
+                    this.setTool('line');
+                    return;
+                case 'x':
+                    this.setTool('text');
+                    return;
+                case 'delete':
+                case 'backspace':
+                    this.deleteSelected();
+                    return;
+                case 'escape':
+                    this.selectedElements = [];
+                    this.render();
+                    this.updatePropertyPanel();
+                    return;
+            }
+        }
+
+        // Ctrl/Cmd shortcuts
+        if (e.ctrlKey || e.metaKey) {
+            switch (key) {
+                case 'c':
+                    e.preventDefault();
+                    this.copy();
+                    return;
+                case 'v':
+                    // Let paste event handle images
+                    if (this.clipboard.length > 0) {
+                        e.preventDefault();
+                        this.paste();
+                    }
+                    return;
+                case 'x':
+                    e.preventDefault();
+                    this.cut();
+                    return;
+                case 'z':
+                    e.preventDefault();
+                    if (e.shiftKey) {
+                        this.redo();
+                    } else {
+                        this.undo();
+                    }
+                    return;
+                case 'y':
+                    e.preventDefault();
+                    this.redo();
+                    return;
+                case 'a':
+                    e.preventDefault();
+                    this.selectAll();
+                    return;
+                case 's':
+                    e.preventDefault();
+                    this.showSaveModal();
+                    return;
+                case 'o':
+                    e.preventDefault();
+                    this.showLoadModal();
+                    return;
+                case 'd':
+                    e.preventDefault();
+                    this.duplicate();
+                    return;
+            }
+        }
+    }
+
+    // Paste Handler
+    handlePaste(e) {
+        const items = e.clipboardData?.items;
+        if (!items) return;
+
+        for (let item of items) {
+            if (item.type.startsWith('image/')) {
+                e.preventDefault();
+                const file = item.getAsFile();
+                this.addImageFromFile(file);
+                return;
+            }
+        }
+    }
+
+    // Drop Handler
+    handleDrop(e) {
+        e.preventDefault();
+        const files = e.dataTransfer?.files;
+        if (!files) return;
+
+        for (let file of files) {
+            if (file.type.startsWith('image/')) {
+                this.addImageFromFile(file, this.getMousePos(e));
+                break;
+            }
+        }
+    }
+
+    addImageFromFile(file, pos = null) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const img = new Image();
+            img.onload = () => {
+                const x = pos ? pos.x : this.canvas.width / 2 - img.width / 2;
+                const y = pos ? pos.y : this.canvas.height / 2 - img.height / 2;
+
+                // Scale down large images
+                let width = img.width;
+                let height = img.height;
+                const maxSize = 400;
+
+                if (width > maxSize || height > maxSize) {
+                    const ratio = Math.min(maxSize / width, maxSize / height);
+                    width *= ratio;
+                    height *= ratio;
+                }
+
+                const imageElement = {
+                    type: 'image',
+                    x: x,
+                    y: y,
+                    width: width,
+                    height: height,
+                    imageData: event.target.result,
+                    image: img,
+                    text: ''
+                };
+
+                this.elements.push(imageElement);
+                this.selectedElements = [imageElement];
+                this.saveState();
+                this.render();
+                this.updatePropertyPanel();
+            };
+            img.src = event.target.result;
+        };
+        reader.readAsDataURL(file);
+    }
+
+    // Element Creation
+    createElement(type, x1, y1, x2, y2) {
+        const baseElement = {
+            type: type,
+            fillColor: this.fillColor,
+            strokeColor: this.strokeColor,
+            strokeWidth: this.strokeWidth,
+            text: '',
+            fontSize: this.fontSize
+        };
+
+        switch (type) {
+            case 'rect':
+            case 'circle':
+            case 'diamond':
+            case 'triangle':
+            case 'text':
+                return {
+                    ...baseElement,
+                    x: Math.min(x1, x2),
+                    y: Math.min(y1, y2),
+                    width: Math.abs(x2 - x1),
+                    height: Math.abs(y2 - y1)
+                };
+            case 'arrow':
+            case 'line':
+                return {
+                    ...baseElement,
+                    x: x1,
+                    y: y1,
+                    x2: x2,
+                    y2: y2
+                };
+            default:
+                return baseElement;
+        }
+    }
+
+    updateTempElement(pos) {
+        if (!this.tempElement) return;
+
+        const type = this.tempElement.type;
+
+        if (type === 'arrow' || type === 'line') {
+            this.tempElement.x2 = pos.x;
+            this.tempElement.y2 = pos.y;
+        } else {
+            this.tempElement.x = Math.min(this.drawStart.x, pos.x);
+            this.tempElement.y = Math.min(this.drawStart.y, pos.y);
+            this.tempElement.width = Math.abs(pos.x - this.drawStart.x);
+            this.tempElement.height = Math.abs(pos.y - this.drawStart.y);
+        }
+    }
+
+    finalizeElement(pos) {
+        if (!this.tempElement) return;
+
+        // Minimum size check
+        const minSize = 10;
+        let valid = true;
+
+        if (this.tempElement.type === 'arrow' || this.tempElement.type === 'line') {
+            const dx = this.tempElement.x2 - this.tempElement.x;
+            const dy = this.tempElement.y2 - this.tempElement.y;
+            valid = Math.sqrt(dx * dx + dy * dy) > minSize;
+        } else {
+            valid = this.tempElement.width > minSize || this.tempElement.height > minSize;
+        }
+
+        if (valid) {
+            this.elements.push(this.tempElement);
+            this.selectedElements = [this.tempElement];
+            this.saveState();
+
+            // If text tool, start editing
+            if (this.tempElement.type === 'text') {
+                this.editElementText(this.tempElement);
+            }
+        }
+
+        this.tempElement = null;
+        this.updatePropertyPanel();
+    }
+
+    // Rendering
+    render() {
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+        // Apply pan and zoom
+        this.ctx.save();
+        this.ctx.translate(this.panOffset.x, this.panOffset.y);
+        this.ctx.scale(this.zoom, this.zoom);
+
+        // Draw all elements
+        this.elements.forEach(element => {
+            this.drawElement(element);
+        });
+
+        // Draw selection indicators
+        this.selectedElements.forEach(element => {
+            this.drawSelectionIndicator(element);
+        });
+
+        this.ctx.restore();
+    }
+
+    drawElement(element) {
+        this.ctx.save();
+        this.ctx.fillStyle = element.fillColor || this.fillColor;
+        this.ctx.strokeStyle = element.strokeColor || this.strokeColor;
+        this.ctx.lineWidth = element.strokeWidth || this.strokeWidth;
+
+        switch (element.type) {
+            case 'rect':
+                this.drawRect(element);
+                break;
+            case 'circle':
+                this.drawCircle(element);
+                break;
+            case 'diamond':
+                this.drawDiamond(element);
+                break;
+            case 'triangle':
+                this.drawTriangle(element);
+                break;
+            case 'arrow':
+                this.drawArrow(element);
+                break;
+            case 'line':
+                this.drawLine(element);
+                break;
+            case 'text':
+                this.drawText(element);
+                break;
+            case 'image':
+                this.drawImage(element);
+                break;
+        }
+
+        this.ctx.restore();
+    }
+
+    drawRect(element) {
+        const { x, y, width, height } = element;
+        const radius = Math.min(8, width / 4, height / 4);
+
+        this.ctx.beginPath();
+        this.ctx.roundRect(x, y, width, height, radius);
+        this.ctx.fill();
+        this.ctx.stroke();
+
+        this.drawElementText(element);
+    }
+
+    drawCircle(element) {
+        const { x, y, width, height } = element;
+        const rx = width / 2;
+        const ry = height / 2;
+        const cx = x + rx;
+        const cy = y + ry;
+
+        this.ctx.beginPath();
+        this.ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+        this.ctx.fill();
+        this.ctx.stroke();
+
+        this.drawElementText(element);
+    }
+
+    drawDiamond(element) {
+        const { x, y, width, height } = element;
+        const cx = x + width / 2;
+        const cy = y + height / 2;
+
+        this.ctx.beginPath();
+        this.ctx.moveTo(cx, y);
+        this.ctx.lineTo(x + width, cy);
+        this.ctx.lineTo(cx, y + height);
+        this.ctx.lineTo(x, cy);
+        this.ctx.closePath();
+        this.ctx.fill();
+        this.ctx.stroke();
+
+        this.drawElementText(element);
+    }
+
+    drawTriangle(element) {
+        const { x, y, width, height } = element;
+
+        this.ctx.beginPath();
+        this.ctx.moveTo(x + width / 2, y);
+        this.ctx.lineTo(x + width, y + height);
+        this.ctx.lineTo(x, y + height);
+        this.ctx.closePath();
+        this.ctx.fill();
+        this.ctx.stroke();
+
+        this.drawElementText(element);
+    }
+
+    drawArrow(element) {
+        const { x, y, x2, y2 } = element;
+
+        // Draw line
+        this.ctx.beginPath();
+        this.ctx.moveTo(x, y);
+        this.ctx.lineTo(x2, y2);
+        this.ctx.stroke();
+
+        // Draw arrowhead
+        const angle = Math.atan2(y2 - y, x2 - x);
+        const headLength = 15;
+
+        this.ctx.beginPath();
+        this.ctx.moveTo(x2, y2);
+        this.ctx.lineTo(
+            x2 - headLength * Math.cos(angle - Math.PI / 6),
+            y2 - headLength * Math.sin(angle - Math.PI / 6)
+        );
+        this.ctx.moveTo(x2, y2);
+        this.ctx.lineTo(
+            x2 - headLength * Math.cos(angle + Math.PI / 6),
+            y2 - headLength * Math.sin(angle + Math.PI / 6)
+        );
+        this.ctx.stroke();
+    }
+
+    drawLine(element) {
+        const { x, y, x2, y2 } = element;
+
+        this.ctx.beginPath();
+        this.ctx.moveTo(x, y);
+        this.ctx.lineTo(x2, y2);
+        this.ctx.stroke();
+    }
+
+    drawText(element) {
+        const { x, y, width, height, text, fontSize } = element;
+
+        // Draw background
+        this.ctx.fillStyle = element.fillColor || 'transparent';
+        if (element.fillColor && element.fillColor !== 'transparent') {
+            this.ctx.fillRect(x, y, width, height);
+        }
+
+        // Draw text
+        this.ctx.fillStyle = element.strokeColor || '#ffffff';
+        this.ctx.font = `${fontSize || 14}px -apple-system, BlinkMacSystemFont, sans-serif`;
+        this.ctx.textAlign = 'center';
+        this.ctx.textBaseline = 'middle';
+
+        if (text) {
+            const lines = text.split('\n');
+            const lineHeight = (fontSize || 14) * 1.3;
+            const startY = y + height / 2 - (lines.length - 1) * lineHeight / 2;
+
+            lines.forEach((line, i) => {
+                this.ctx.fillText(line, x + width / 2, startY + i * lineHeight);
+            });
+        }
+    }
+
+    drawImage(element) {
+        if (element.image) {
+            this.ctx.drawImage(element.image, element.x, element.y, element.width, element.height);
+        } else if (element.imageData) {
+            // Recreate image if needed
+            const img = new Image();
+            img.src = element.imageData;
+            element.image = img;
+            img.onload = () => this.render();
+        }
+    }
+
+    drawElementText(element) {
+        if (!element.text) return;
+
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.font = `${element.fontSize || 14}px -apple-system, BlinkMacSystemFont, sans-serif`;
+        this.ctx.textAlign = 'center';
+        this.ctx.textBaseline = 'middle';
+
+        const cx = element.x + (element.width || 0) / 2;
+        const cy = element.y + (element.height || 0) / 2;
+
+        const lines = element.text.split('\n');
+        const lineHeight = (element.fontSize || 14) * 1.3;
+        const startY = cy - (lines.length - 1) * lineHeight / 2;
+
+        lines.forEach((line, i) => {
+            this.ctx.fillText(line, cx, startY + i * lineHeight);
+        });
+    }
+
+    drawSelectionIndicator(element) {
+        const bounds = this.getElementBounds(element);
+        const padding = 5;
+
+        this.ctx.strokeStyle = '#7c8dff';
+        this.ctx.lineWidth = 2;
+        this.ctx.setLineDash([5, 5]);
+        this.ctx.strokeRect(
+            bounds.x - padding,
+            bounds.y - padding,
+            bounds.width + padding * 2,
+            bounds.height + padding * 2
+        );
+        this.ctx.setLineDash([]);
+
+        // Draw resize handles
+        const handleSize = 8;
+        const handles = this.getResizeHandles(element);
+
+        this.ctx.fillStyle = '#7c8dff';
+        handles.forEach(handle => {
+            this.ctx.fillRect(
+                handle.x - handleSize / 2,
+                handle.y - handleSize / 2,
+                handleSize,
+                handleSize
+            );
+        });
+    }
+
+    drawSelectionBox(start, end) {
+        const x = Math.min(start.x, end.x);
+        const y = Math.min(start.y, end.y);
+        const width = Math.abs(end.x - start.x);
+        const height = Math.abs(end.y - start.y);
+
+        this.ctx.save();
+        this.ctx.translate(this.panOffset.x, this.panOffset.y);
+        this.ctx.scale(this.zoom, this.zoom);
+
+        this.ctx.strokeStyle = '#7c8dff';
+        this.ctx.fillStyle = 'rgba(124, 141, 255, 0.1)';
+        this.ctx.lineWidth = 1;
+        this.ctx.setLineDash([5, 5]);
+
+        this.ctx.fillRect(x, y, width, height);
+        this.ctx.strokeRect(x, y, width, height);
+
+        this.ctx.restore();
+    }
+
+    // Helper Methods
+    getMousePos(e) {
+        const rect = this.canvas.getBoundingClientRect();
+        const x = (e.clientX - rect.left - this.panOffset.x) / this.zoom;
+        const y = (e.clientY - rect.top - this.panOffset.y) / this.zoom;
+        return { x, y };
+    }
+
+    getElementBounds(element) {
+        if (element.type === 'arrow' || element.type === 'line') {
+            return {
+                x: Math.min(element.x, element.x2),
+                y: Math.min(element.y, element.y2),
+                width: Math.abs(element.x2 - element.x),
+                height: Math.abs(element.y2 - element.y)
+            };
+        }
+        return {
+            x: element.x,
+            y: element.y,
+            width: element.width || 0,
+            height: element.height || 0
+        };
+    }
+
+    getElementAtPosition(pos) {
+        // Check in reverse order (top elements first)
+        for (let i = this.elements.length - 1; i >= 0; i--) {
+            if (this.isPointInElement(pos, this.elements[i])) {
+                return this.elements[i];
+            }
+        }
+        return null;
+    }
+
+    isPointInElement(pos, element) {
+        const bounds = this.getElementBounds(element);
+        const padding = 5;
+
+        return pos.x >= bounds.x - padding &&
+               pos.x <= bounds.x + bounds.width + padding &&
+               pos.y >= bounds.y - padding &&
+               pos.y <= bounds.y + bounds.height + padding;
+    }
+
+    getResizeHandles(element) {
+        const bounds = this.getElementBounds(element);
+        const { x, y, width, height } = bounds;
+
+        if (element.type === 'arrow' || element.type === 'line') {
+            return [
+                { x: element.x, y: element.y, type: 'start' },
+                { x: element.x2, y: element.y2, type: 'end' }
+            ];
+        }
+
+        return [
+            { x: x, y: y, type: 'nw' },
+            { x: x + width, y: y, type: 'ne' },
+            { x: x + width, y: y + height, type: 'se' },
+            { x: x, y: y + height, type: 'sw' },
+            { x: x + width / 2, y: y, type: 'n' },
+            { x: x + width, y: y + height / 2, type: 'e' },
+            { x: x + width / 2, y: y + height, type: 's' },
+            { x: x, y: y + height / 2, type: 'w' }
+        ];
+    }
+
+    getResizeHandle(pos) {
+        for (let element of this.selectedElements) {
+            const handles = this.getResizeHandles(element);
+            for (let handle of handles) {
+                const dist = Math.sqrt(
+                    Math.pow(pos.x - handle.x, 2) + Math.pow(pos.y - handle.y, 2)
+                );
+                if (dist < 10) {
+                    return { element, handle };
+                }
+            }
+        }
+        return null;
+    }
+
+    handleResize(pos) {
+        const { element, handle } = this.resizeHandle;
+
+        if (element.type === 'arrow' || element.type === 'line') {
+            if (handle.type === 'start') {
+                element.x = pos.x;
+                element.y = pos.y;
+            } else {
+                element.x2 = pos.x;
+                element.y2 = pos.y;
+            }
+            return;
+        }
+
+        const bounds = this.getElementBounds(element);
+        let newX = element.x;
+        let newY = element.y;
+        let newWidth = element.width;
+        let newHeight = element.height;
+
+        switch (handle.type) {
+            case 'nw':
+                newWidth = bounds.x + bounds.width - pos.x;
+                newHeight = bounds.y + bounds.height - pos.y;
+                newX = pos.x;
+                newY = pos.y;
+                break;
+            case 'ne':
+                newWidth = pos.x - element.x;
+                newHeight = bounds.y + bounds.height - pos.y;
+                newY = pos.y;
+                break;
+            case 'se':
+                newWidth = pos.x - element.x;
+                newHeight = pos.y - element.y;
+                break;
+            case 'sw':
+                newWidth = bounds.x + bounds.width - pos.x;
+                newHeight = pos.y - element.y;
+                newX = pos.x;
+                break;
+            case 'n':
+                newHeight = bounds.y + bounds.height - pos.y;
+                newY = pos.y;
+                break;
+            case 'e':
+                newWidth = pos.x - element.x;
+                break;
+            case 's':
+                newHeight = pos.y - element.y;
+                break;
+            case 'w':
+                newWidth = bounds.x + bounds.width - pos.x;
+                newX = pos.x;
+                break;
+        }
+
+        // Minimum size
+        if (newWidth > 10) {
+            element.x = newX;
+            element.width = newWidth;
+        }
+        if (newHeight > 10) {
+            element.y = newY;
+            element.height = newHeight;
+        }
+    }
+
+    updateCursor(pos) {
+        const handle = this.getResizeHandle(pos);
+        if (handle) {
+            const type = handle.handle.type;
+            const cursors = {
+                'nw': 'nw-resize', 'ne': 'ne-resize',
+                'se': 'se-resize', 'sw': 'sw-resize',
+                'n': 'n-resize', 's': 's-resize',
+                'e': 'e-resize', 'w': 'w-resize',
+                'start': 'move', 'end': 'move'
+            };
+            this.canvas.style.cursor = cursors[type] || 'move';
+            return;
+        }
+
+        const element = this.getElementAtPosition(pos);
+        if (element && this.currentTool === 'select') {
+            this.canvas.style.cursor = 'move';
+        } else {
+            this.canvas.style.cursor = this.currentTool === 'select' ? 'default' : 'crosshair';
+        }
+    }
+
+    selectElementsInBox(start, end) {
+        const x1 = Math.min(start.x, end.x);
+        const y1 = Math.min(start.y, end.y);
+        const x2 = Math.max(start.x, end.x);
+        const y2 = Math.max(start.y, end.y);
+
+        this.elements.forEach(element => {
+            const bounds = this.getElementBounds(element);
+            if (bounds.x >= x1 && bounds.x + bounds.width <= x2 &&
+                bounds.y >= y1 && bounds.y + bounds.height <= y2) {
+                if (!this.selectedElements.includes(element)) {
+                    this.selectedElements.push(element);
+                }
+            }
+        });
+
+        this.updatePropertyPanel();
+    }
+
+    // Clipboard Operations
+    copy() {
+        if (this.selectedElements.length === 0) return;
+
+        this.clipboard = this.selectedElements.map(el => ({
+            ...el,
+            image: undefined // Don't copy image objects
+        }));
+    }
+
+    cut() {
+        this.copy();
+        this.deleteSelected();
+    }
+
+    paste() {
+        if (this.clipboard.length === 0) return;
+
+        const offset = 20;
+        const newElements = this.clipboard.map(el => {
+            const newEl = { ...el };
+            newEl.x += offset;
+            newEl.y += offset;
+            if (newEl.x2 !== undefined) {
+                newEl.x2 += offset;
+                newEl.y2 += offset;
+            }
+
+            // Recreate image if needed
+            if (newEl.type === 'image' && newEl.imageData) {
+                const img = new Image();
+                img.src = newEl.imageData;
+                newEl.image = img;
+            }
+
+            return newEl;
+        });
+
+        this.elements.push(...newElements);
+        this.selectedElements = newElements;
+        this.saveState();
+        this.render();
+        this.updatePropertyPanel();
+    }
+
+    duplicate() {
+        if (this.selectedElements.length === 0) return;
+
+        const offset = 20;
+        const newElements = this.selectedElements.map(el => {
+            const newEl = { ...el };
+            newEl.x += offset;
+            newEl.y += offset;
+            if (newEl.x2 !== undefined) {
+                newEl.x2 += offset;
+                newEl.y2 += offset;
+            }
+
+            if (newEl.type === 'image' && newEl.imageData) {
+                const img = new Image();
+                img.src = newEl.imageData;
+                newEl.image = img;
+            }
+
+            return newEl;
+        });
+
+        this.elements.push(...newElements);
+        this.selectedElements = newElements;
+        this.saveState();
+        this.render();
+        this.updatePropertyPanel();
+    }
+
+    // History Operations
+    saveState() {
+        // Remove any future states
+        this.history = this.history.slice(0, this.historyIndex + 1);
+
+        // Save current state
+        const state = this.elements.map(el => ({
+            ...el,
+            image: undefined
+        }));
+
+        this.history.push(JSON.stringify(state));
+        this.historyIndex = this.history.length - 1;
+
+        // Limit history size
+        if (this.history.length > this.maxHistory) {
+            this.history.shift();
+            this.historyIndex--;
+        }
+    }
+
+    undo() {
+        if (this.historyIndex <= 0) return;
+
+        this.historyIndex--;
+        this.loadState(this.history[this.historyIndex]);
+    }
+
+    redo() {
+        if (this.historyIndex >= this.history.length - 1) return;
+
+        this.historyIndex++;
+        this.loadState(this.history[this.historyIndex]);
+    }
+
+    loadState(stateJson) {
+        const state = JSON.parse(stateJson);
+
+        // Recreate images
+        this.elements = state.map(el => {
+            if (el.type === 'image' && el.imageData) {
+                const img = new Image();
+                img.src = el.imageData;
+                el.image = img;
+            }
+            return el;
+        });
+
+        this.selectedElements = [];
+        this.render();
+        this.updatePropertyPanel();
+    }
+
+    // Element Operations
+    deleteSelected() {
+        if (this.selectedElements.length === 0) return;
+
+        this.elements = this.elements.filter(el => !this.selectedElements.includes(el));
+        this.selectedElements = [];
+        this.saveState();
+        this.render();
+        this.updatePropertyPanel();
+    }
+
+    selectAll() {
+        this.selectedElements = [...this.elements];
+        this.render();
+        this.updatePropertyPanel();
+    }
+
+    clearCanvas() {
+        if (confirm('Are you sure you want to clear the canvas?')) {
+            this.elements = [];
+            this.selectedElements = [];
+            this.saveState();
+            this.render();
+            this.updatePropertyPanel();
+        }
+    }
+
+    // Text Editing
+    editElementText(element) {
+        const bounds = this.getElementBounds(element);
+
+        // Create text input overlay
+        let overlay = document.getElementById('textInputOverlay');
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.id = 'textInputOverlay';
+            document.getElementById('canvasContainer').appendChild(overlay);
+        }
+
+        const textarea = document.createElement('textarea');
+        textarea.value = element.text || '';
+        textarea.style.width = Math.max(bounds.width, 100) + 'px';
+        textarea.style.height = Math.max(bounds.height, 40) + 'px';
+        textarea.style.fontSize = (element.fontSize || 14) + 'px';
+
+        overlay.innerHTML = '';
+        overlay.appendChild(textarea);
+        overlay.style.display = 'block';
+        overlay.style.left = (bounds.x * this.zoom + this.panOffset.x) + 'px';
+        overlay.style.top = (bounds.y * this.zoom + this.panOffset.y) + 'px';
+
+        textarea.focus();
+        textarea.select();
+
+        const finishEdit = () => {
+            element.text = textarea.value;
+            overlay.style.display = 'none';
+            this.saveState();
+            this.render();
+        };
+
+        textarea.addEventListener('blur', finishEdit);
+        textarea.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                overlay.style.display = 'none';
+                this.render();
+            } else if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                finishEdit();
+            }
+        });
+    }
+
+    // Toolbar Setup
+    setupToolbar() {
+        const tools = ['select', 'rect', 'circle', 'diamond', 'triangle', 'arrow', 'line', 'text'];
+
+        tools.forEach(tool => {
+            const btn = document.getElementById(tool + 'Tool');
+            if (btn) {
+                btn.addEventListener('click', () => this.setTool(tool));
+            }
+        });
+
+        // Color pickers
+        document.getElementById('fillColor').addEventListener('input', (e) => {
+            this.fillColor = e.target.value;
+        });
+
+        document.getElementById('strokeColor').addEventListener('input', (e) => {
+            this.strokeColor = e.target.value;
+        });
+
+        document.getElementById('strokeWidth').addEventListener('input', (e) => {
+            this.strokeWidth = parseInt(e.target.value);
+        });
+
+        // Action buttons
+        document.getElementById('saveBtn').addEventListener('click', () => this.showSaveModal());
+        document.getElementById('loadBtn').addEventListener('click', () => this.showLoadModal());
+        document.getElementById('clearBtn').addEventListener('click', () => this.clearCanvas());
+        document.getElementById('exportBtn').addEventListener('click', () => this.exportAsPng());
+    }
+
+    setTool(tool) {
+        this.currentTool = tool;
+
+        // Update toolbar UI
+        document.querySelectorAll('.tool-btn').forEach(btn => {
+            btn.classList.remove('active');
+        });
+
+        const btn = document.getElementById(tool + 'Tool');
+        if (btn) {
+            btn.classList.add('active');
+        }
+
+        this.canvas.style.cursor = tool === 'select' ? 'default' : 'crosshair';
+    }
+
+    // Property Panel
+    setupPropertyPanel() {
+        const elementText = document.getElementById('elementText');
+        const elementFill = document.getElementById('elementFill');
+        const elementStroke = document.getElementById('elementStroke');
+        const elementStrokeWidth = document.getElementById('elementStrokeWidth');
+        const elementFontSize = document.getElementById('elementFontSize');
+        const deleteBtn = document.getElementById('deleteElement');
+
+        elementText.addEventListener('input', (e) => {
+            this.selectedElements.forEach(el => {
+                el.text = e.target.value;
+            });
+            this.render();
+        });
+
+        elementText.addEventListener('change', () => {
+            this.saveState();
+        });
+
+        elementFill.addEventListener('input', (e) => {
+            this.selectedElements.forEach(el => {
+                el.fillColor = e.target.value;
+            });
+            this.render();
+        });
+
+        elementFill.addEventListener('change', () => {
+            this.saveState();
+        });
+
+        elementStroke.addEventListener('input', (e) => {
+            this.selectedElements.forEach(el => {
+                el.strokeColor = e.target.value;
+            });
+            this.render();
+        });
+
+        elementStroke.addEventListener('change', () => {
+            this.saveState();
+        });
+
+        elementStrokeWidth.addEventListener('input', (e) => {
+            this.selectedElements.forEach(el => {
+                el.strokeWidth = parseInt(e.target.value);
+            });
+            this.render();
+        });
+
+        elementStrokeWidth.addEventListener('change', () => {
+            this.saveState();
+        });
+
+        elementFontSize.addEventListener('input', (e) => {
+            this.selectedElements.forEach(el => {
+                el.fontSize = parseInt(e.target.value);
+            });
+            this.render();
+        });
+
+        elementFontSize.addEventListener('change', () => {
+            this.saveState();
+        });
+
+        deleteBtn.addEventListener('click', () => {
+            this.deleteSelected();
+        });
+    }
+
+    updatePropertyPanel() {
+        const noSelection = document.getElementById('noSelection');
+        const elementProperties = document.getElementById('elementProperties');
+
+        if (this.selectedElements.length === 0) {
+            noSelection.style.display = 'block';
+            elementProperties.style.display = 'none';
+            return;
+        }
+
+        noSelection.style.display = 'none';
+        elementProperties.style.display = 'block';
+
+        const element = this.selectedElements[0];
+
+        document.getElementById('elementText').value = element.text || '';
+        document.getElementById('elementFill').value = element.fillColor || '#4a90d9';
+        document.getElementById('elementStroke').value = element.strokeColor || '#2c5282';
+        document.getElementById('elementStrokeWidth').value = element.strokeWidth || 2;
+        document.getElementById('elementFontSize').value = element.fontSize || 14;
+    }
+
+    // Modal Setup
+    setupModals() {
+        // Save Modal
+        document.getElementById('closeSaveModal').addEventListener('click', () => {
+            document.getElementById('saveModal').style.display = 'none';
+        });
+
+        document.getElementById('confirmSave').addEventListener('click', () => {
+            this.saveMindmap();
+        });
+
+        // Load Modal
+        document.getElementById('closeLoadModal').addEventListener('click', () => {
+            document.getElementById('loadModal').style.display = 'none';
+        });
+
+        // Close modals on background click
+        document.querySelectorAll('.modal').forEach(modal => {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.style.display = 'none';
+                }
+            });
+        });
+    }
+
+    showSaveModal() {
+        if (!FirebaseService.isConfigured()) {
+            alert('Firebase is not configured. Please update js/firebase-config.js with your Firebase credentials.');
+            return;
+        }
+
+        if (!FirebaseService.getCurrentUser()) {
+            alert('Please sign in to save your mindmap.');
+            return;
+        }
+
+        document.getElementById('saveModal').style.display = 'flex';
+        document.getElementById('mindmapName').focus();
+    }
+
+    async saveMindmap() {
+        const name = document.getElementById('mindmapName').value.trim();
+        if (!name) {
+            alert('Please enter a name for your mindmap.');
+            return;
+        }
+
+        try {
+            const data = this.elements.map(el => ({
+                ...el,
+                image: undefined
+            }));
+
+            await FirebaseService.saveMindmap(name, data);
+            document.getElementById('saveModal').style.display = 'none';
+            alert('Mindmap saved successfully!');
+        } catch (error) {
+            console.error('Save error:', error);
+            alert('Failed to save mindmap: ' + error.message);
+        }
+    }
+
+    showLoadModal() {
+        if (!FirebaseService.isConfigured()) {
+            alert('Firebase is not configured. Please update js/firebase-config.js with your Firebase credentials.');
+            return;
+        }
+
+        if (!FirebaseService.getCurrentUser()) {
+            alert('Please sign in to load your mindmaps.');
+            return;
+        }
+
+        document.getElementById('loadModal').style.display = 'flex';
+        this.loadMindmapsList();
+    }
+
+    async loadMindmapsList() {
+        const listEl = document.getElementById('mindmapList');
+        listEl.innerHTML = '<p>Loading...</p>';
+
+        try {
+            const mindmaps = await FirebaseService.loadMindmapsList();
+
+            if (mindmaps.length === 0) {
+                listEl.innerHTML = '<p>No saved mindmaps found.</p>';
+                return;
+            }
+
+            listEl.innerHTML = '';
+            mindmaps.forEach(mindmap => {
+                const item = document.createElement('div');
+                item.className = 'mindmap-item';
+                item.innerHTML = `
+                    <div>
+                        <div class="name">${mindmap.name}</div>
+                        <div class="date">${mindmap.updatedAt.toLocaleDateString()}</div>
+                    </div>
+                    <button class="delete-btn" title="Delete">🗑️</button>
+                `;
+
+                item.querySelector('.name').addEventListener('click', () => {
+                    this.loadMindmap(mindmap.id);
+                });
+
+                item.querySelector('.delete-btn').addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    if (confirm('Delete this mindmap?')) {
+                        await FirebaseService.deleteMindmap(mindmap.id);
+                        this.loadMindmapsList();
+                    }
+                });
+
+                listEl.appendChild(item);
+            });
+        } catch (error) {
+            console.error('Load list error:', error);
+            listEl.innerHTML = '<p>Failed to load mindmaps.</p>';
+        }
+    }
+
+    async loadMindmap(id) {
+        try {
+            const mindmap = await FirebaseService.loadMindmap(id);
+
+            this.elements = mindmap.data.map(el => {
+                if (el.type === 'image' && el.imageData) {
+                    const img = new Image();
+                    img.src = el.imageData;
+                    el.image = img;
+                }
+                return el;
+            });
+
+            this.selectedElements = [];
+            this.history = [];
+            this.historyIndex = -1;
+            this.saveState();
+
+            document.getElementById('loadModal').style.display = 'none';
+            this.render();
+        } catch (error) {
+            console.error('Load error:', error);
+            alert('Failed to load mindmap: ' + error.message);
+        }
+    }
+
+    exportAsPng() {
+        // Create a temporary canvas with white background
+        const tempCanvas = document.createElement('canvas');
+        const tempCtx = tempCanvas.getContext('2d');
+
+        // Calculate bounds
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+        this.elements.forEach(el => {
+            const bounds = this.getElementBounds(el);
+            minX = Math.min(minX, bounds.x);
+            minY = Math.min(minY, bounds.y);
+            maxX = Math.max(maxX, bounds.x + bounds.width);
+            maxY = Math.max(maxY, bounds.y + bounds.height);
+        });
+
+        const padding = 50;
+        const width = maxX - minX + padding * 2;
+        const height = maxY - minY + padding * 2;
+
+        tempCanvas.width = width;
+        tempCanvas.height = height;
+
+        // White background
+        tempCtx.fillStyle = '#ffffff';
+        tempCtx.fillRect(0, 0, width, height);
+
+        // Translate to fit content
+        tempCtx.translate(-minX + padding, -minY + padding);
+
+        // Draw elements
+        const originalCtx = this.ctx;
+        this.ctx = tempCtx;
+        this.elements.forEach(el => this.drawElement(el));
+        this.ctx = originalCtx;
+
+        // Download
+        const link = document.createElement('a');
+        link.download = 'mindmap.png';
+        link.href = tempCanvas.toDataURL('image/png');
+        link.click();
+    }
+
+    // Auth Setup
+    setupAuth() {
+        const signInBtn = document.getElementById('signInBtn');
+        const userStatus = document.getElementById('userStatus');
+
+        signInBtn.addEventListener('click', async () => {
+            if (FirebaseService.getCurrentUser()) {
+                await FirebaseService.signOut();
+            } else {
+                try {
+                    await FirebaseService.signInWithGoogle();
+                } catch (error) {
+                    console.error('Sign in error:', error);
+                    if (error.code !== 'auth/popup-closed-by-user') {
+                        alert('Failed to sign in: ' + error.message);
+                    }
+                }
+            }
+        });
+
+        FirebaseService.onAuthStateChanged((user) => {
+            if (user) {
+                userStatus.textContent = user.email;
+                signInBtn.textContent = 'Sign Out';
+            } else {
+                userStatus.textContent = 'Not signed in';
+                signInBtn.textContent = 'Sign In';
+            }
+        });
+    }
+}
+
+// Initialize app when DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+    window.mindmapApp = new MindmapApp();
+});

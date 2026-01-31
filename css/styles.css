@@ -1,0 +1,451 @@
+/* Reset and Base Styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+    background-color: #1a1a2e;
+    color: #e0e0e0;
+    overflow: hidden;
+    height: 100vh;
+}
+
+#app {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
+/* Toolbar */
+#toolbar {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 10px 20px;
+    background: linear-gradient(180deg, #2d2d44 0%, #1f1f35 100%);
+    border-bottom: 1px solid #3d3d5c;
+    flex-wrap: wrap;
+    z-index: 100;
+}
+
+.toolbar-section {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.toolbar-section h3 {
+    color: #7c8dff;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.toolbar-section.tools {
+    background: rgba(0, 0, 0, 0.2);
+    padding: 5px 10px;
+    border-radius: 8px;
+}
+
+.toolbar-section.colors {
+    gap: 10px;
+}
+
+.toolbar-section.colors label {
+    font-size: 12px;
+    color: #aaa;
+}
+
+.toolbar-section.colors input[type="color"] {
+    width: 30px;
+    height: 30px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    background: none;
+}
+
+.toolbar-section.colors input[type="range"] {
+    width: 80px;
+}
+
+.tool-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 12px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    color: #ccc;
+    cursor: pointer;
+    font-size: 13px;
+    transition: all 0.2s ease;
+}
+
+.tool-btn:hover {
+    background: rgba(124, 141, 255, 0.1);
+    border-color: rgba(124, 141, 255, 0.3);
+    color: #fff;
+}
+
+.tool-btn.active {
+    background: rgba(124, 141, 255, 0.2);
+    border-color: #7c8dff;
+    color: #7c8dff;
+}
+
+.tool-btn .icon {
+    font-size: 16px;
+}
+
+.action-btn {
+    padding: 8px 16px;
+    background: linear-gradient(180deg, #4a5568 0%, #2d3748 100%);
+    border: 1px solid #4a5568;
+    border-radius: 6px;
+    color: #fff;
+    cursor: pointer;
+    font-size: 13px;
+    transition: all 0.2s ease;
+}
+
+.action-btn:hover {
+    background: linear-gradient(180deg, #5a6578 0%, #3d4758 100%);
+    border-color: #7c8dff;
+}
+
+.action-btn.danger {
+    background: linear-gradient(180deg, #e53e3e 0%, #c53030 100%);
+    border-color: #e53e3e;
+}
+
+.action-btn.danger:hover {
+    background: linear-gradient(180deg, #f56565 0%, #e53e3e 100%);
+}
+
+.user-section {
+    margin-left: auto;
+    gap: 12px;
+}
+
+#userStatus {
+    font-size: 12px;
+    color: #888;
+}
+
+/* Canvas Container */
+#canvasContainer {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    background-color: #16162a;
+    background-image:
+        linear-gradient(rgba(124, 141, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(124, 141, 255, 0.03) 1px, transparent 1px);
+    background-size: 20px 20px;
+}
+
+#mindmapCanvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    cursor: crosshair;
+}
+
+/* Shortcuts Panel */
+#shortcutsPanel {
+    position: fixed;
+    left: 10px;
+    top: 80px;
+    width: 180px;
+    background: rgba(30, 30, 50, 0.95);
+    border: 1px solid #3d3d5c;
+    border-radius: 10px;
+    padding: 15px;
+    z-index: 50;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+#shortcutsPanel h4 {
+    color: #7c8dff;
+    font-size: 14px;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #3d3d5c;
+}
+
+#shortcutsPanel ul {
+    list-style: none;
+    font-size: 12px;
+}
+
+#shortcutsPanel li {
+    margin: 6px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+#shortcutsPanel kbd {
+    background: #2d2d44;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 11px;
+    color: #7c8dff;
+    border: 1px solid #4d4d6c;
+}
+
+#shortcutsPanel .tip {
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid #3d3d5c;
+    font-size: 11px;
+    color: #88cc88;
+    font-style: italic;
+}
+
+/* Properties Panel */
+#propertiesPanel {
+    position: fixed;
+    right: 10px;
+    top: 80px;
+    width: 220px;
+    background: rgba(30, 30, 50, 0.95);
+    border: 1px solid #3d3d5c;
+    border-radius: 10px;
+    padding: 15px;
+    z-index: 50;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+#propertiesPanel h4 {
+    color: #7c8dff;
+    font-size: 14px;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #3d3d5c;
+}
+
+#noSelection p {
+    color: #888;
+    font-size: 12px;
+    text-align: center;
+    padding: 20px 0;
+}
+
+.property-group {
+    margin-bottom: 12px;
+}
+
+.property-group label {
+    display: block;
+    font-size: 11px;
+    color: #aaa;
+    margin-bottom: 4px;
+}
+
+.property-group input[type="text"],
+.property-group input[type="number"],
+.property-group textarea {
+    width: 100%;
+    padding: 8px;
+    background: #1a1a2e;
+    border: 1px solid #3d3d5c;
+    border-radius: 4px;
+    color: #fff;
+    font-size: 13px;
+}
+
+.property-group input[type="text"]:focus,
+.property-group input[type="number"]:focus,
+.property-group textarea:focus {
+    outline: none;
+    border-color: #7c8dff;
+}
+
+.property-group input[type="color"] {
+    width: 100%;
+    height: 35px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    background: none;
+}
+
+.property-group input[type="range"] {
+    width: 100%;
+}
+
+#elementProperties button {
+    width: 100%;
+    margin-top: 10px;
+}
+
+/* Modal */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: #2d2d44;
+    border: 1px solid #3d3d5c;
+    border-radius: 12px;
+    padding: 25px;
+    min-width: 400px;
+    max-width: 500px;
+    max-height: 70vh;
+    overflow-y: auto;
+}
+
+.modal-content h3 {
+    color: #7c8dff;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #3d3d5c;
+}
+
+.modal-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    margin-top: 20px;
+}
+
+#mindmapList {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.mindmap-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 6px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.mindmap-item:hover {
+    background: rgba(124, 141, 255, 0.1);
+    border: 1px solid rgba(124, 141, 255, 0.3);
+}
+
+.mindmap-item .name {
+    font-weight: 500;
+}
+
+.mindmap-item .date {
+    font-size: 11px;
+    color: #888;
+}
+
+.mindmap-item .delete-btn {
+    background: transparent;
+    border: none;
+    color: #e53e3e;
+    cursor: pointer;
+    font-size: 16px;
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+
+.mindmap-item .delete-btn:hover {
+    background: rgba(229, 62, 62, 0.2);
+}
+
+/* Selection Box */
+.selection-box {
+    position: absolute;
+    border: 2px dashed #7c8dff;
+    background: rgba(124, 141, 255, 0.1);
+    pointer-events: none;
+}
+
+/* Text Input Overlay */
+#textInputOverlay {
+    position: absolute;
+    display: none;
+    z-index: 100;
+}
+
+#textInputOverlay textarea {
+    padding: 8px;
+    font-size: 14px;
+    font-family: inherit;
+    border: 2px solid #7c8dff;
+    border-radius: 4px;
+    background: rgba(26, 26, 46, 0.95);
+    color: #fff;
+    resize: both;
+    min-width: 100px;
+    min-height: 40px;
+}
+
+/* Connection Points */
+.connection-point {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    background: #7c8dff;
+    border: 2px solid #fff;
+    border-radius: 50%;
+    cursor: crosshair;
+    transform: translate(-50%, -50%);
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #1a1a2e;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #3d3d5c;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #4d4d6c;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1200px) {
+    #shortcutsPanel {
+        display: none;
+    }
+}
+
+@media (max-width: 900px) {
+    #propertiesPanel {
+        display: none;
+    }
+
+    #toolbar {
+        padding: 8px 10px;
+        gap: 10px;
+    }
+
+    .tool-btn span:not(.icon) {
+        display: none;
+    }
+}

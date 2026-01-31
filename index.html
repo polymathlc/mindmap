@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mindmap App</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Toolbar -->
+        <div id="toolbar">
+            <div class="toolbar-section">
+                <h3>Mindmap</h3>
+            </div>
+            <div class="toolbar-section tools">
+                <button id="selectTool" class="tool-btn active" title="Select (V)">
+                    <span class="icon">↖</span> Select
+                </button>
+                <button id="rectTool" class="tool-btn" title="Rectangle (R)">
+                    <span class="icon">▭</span> Rectangle
+                </button>
+                <button id="circleTool" class="tool-btn" title="Circle (C)">
+                    <span class="icon">○</span> Circle
+                </button>
+                <button id="diamondTool" class="tool-btn" title="Diamond (D)">
+                    <span class="icon">◇</span> Diamond
+                </button>
+                <button id="triangleTool" class="tool-btn" title="Triangle (T)">
+                    <span class="icon">△</span> Triangle
+                </button>
+                <button id="arrowTool" class="tool-btn" title="Arrow (A)">
+                    <span class="icon">→</span> Arrow
+                </button>
+                <button id="lineTool" class="tool-btn" title="Line (L)">
+                    <span class="icon">—</span> Line
+                </button>
+                <button id="textTool" class="tool-btn" title="Text (X)">
+                    <span class="icon">T</span> Text
+                </button>
+            </div>
+            <div class="toolbar-section colors">
+                <label>Fill:</label>
+                <input type="color" id="fillColor" value="#4a90d9">
+                <label>Stroke:</label>
+                <input type="color" id="strokeColor" value="#2c5282">
+                <label>Size:</label>
+                <input type="range" id="strokeWidth" min="1" max="10" value="2">
+            </div>
+            <div class="toolbar-section actions">
+                <button id="saveBtn" class="action-btn" title="Save to Firebase (Ctrl+S)">💾 Save</button>
+                <button id="loadBtn" class="action-btn" title="Load from Firebase (Ctrl+O)">📂 Load</button>
+                <button id="clearBtn" class="action-btn" title="Clear Canvas">🗑️ Clear</button>
+                <button id="exportBtn" class="action-btn" title="Export as PNG">📷 Export</button>
+            </div>
+            <div class="toolbar-section user-section">
+                <span id="userStatus">Not signed in</span>
+                <button id="signInBtn" class="action-btn">Sign In</button>
+            </div>
+        </div>
+
+        <!-- Shortcuts Help Panel -->
+        <div id="shortcutsPanel">
+            <h4>Keyboard Shortcuts</h4>
+            <ul>
+                <li><kbd>V</kbd> - Select tool</li>
+                <li><kbd>R</kbd> - Rectangle</li>
+                <li><kbd>C</kbd> - Circle</li>
+                <li><kbd>D</kbd> - Diamond</li>
+                <li><kbd>T</kbd> - Triangle</li>
+                <li><kbd>A</kbd> - Arrow</li>
+                <li><kbd>L</kbd> - Line</li>
+                <li><kbd>X</kbd> - Text</li>
+                <li><kbd>Delete</kbd> - Delete selected</li>
+                <li><kbd>Ctrl+C</kbd> - Copy</li>
+                <li><kbd>Ctrl+V</kbd> - Paste</li>
+                <li><kbd>Ctrl+Z</kbd> - Undo</li>
+                <li><kbd>Ctrl+Y</kbd> - Redo</li>
+                <li><kbd>Ctrl+S</kbd> - Save</li>
+                <li><kbd>Ctrl+O</kbd> - Load</li>
+                <li><kbd>Ctrl+A</kbd> - Select all</li>
+                <li><kbd>Esc</kbd> - Deselect</li>
+            </ul>
+            <p class="tip">Paste images with Ctrl+V!</p>
+        </div>
+
+        <!-- Canvas Container -->
+        <div id="canvasContainer">
+            <canvas id="mindmapCanvas"></canvas>
+        </div>
+
+        <!-- Properties Panel -->
+        <div id="propertiesPanel">
+            <h4>Properties</h4>
+            <div id="noSelection">
+                <p>Select an element to edit its properties</p>
+            </div>
+            <div id="elementProperties" style="display: none;">
+                <div class="property-group">
+                    <label>Text:</label>
+                    <textarea id="elementText" rows="3" placeholder="Enter text..."></textarea>
+                </div>
+                <div class="property-group">
+                    <label>Fill Color:</label>
+                    <input type="color" id="elementFill" value="#4a90d9">
+                </div>
+                <div class="property-group">
+                    <label>Stroke Color:</label>
+                    <input type="color" id="elementStroke" value="#2c5282">
+                </div>
+                <div class="property-group">
+                    <label>Stroke Width:</label>
+                    <input type="range" id="elementStrokeWidth" min="1" max="10" value="2">
+                </div>
+                <div class="property-group">
+                    <label>Font Size:</label>
+                    <input type="number" id="elementFontSize" min="8" max="72" value="14">
+                </div>
+                <button id="deleteElement" class="action-btn danger">Delete Element</button>
+            </div>
+        </div>
+
+        <!-- Load Modal -->
+        <div id="loadModal" class="modal" style="display: none;">
+            <div class="modal-content">
+                <h3>Load Mindmap</h3>
+                <div id="mindmapList">
+                    <p>Loading...</p>
+                </div>
+                <div class="modal-actions">
+                    <button id="closeLoadModal" class="action-btn">Cancel</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Save Modal -->
+        <div id="saveModal" class="modal" style="display: none;">
+            <div class="modal-content">
+                <h3>Save Mindmap</h3>
+                <div class="property-group">
+                    <label>Name:</label>
+                    <input type="text" id="mindmapName" placeholder="My Mindmap">
+                </div>
+                <div class="modal-actions">
+                    <button id="confirmSave" class="action-btn">Save</button>
+                    <button id="closeSaveModal" class="action-btn">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
+
+    <!-- App Scripts -->
+    <script src="js/firebase-config.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
