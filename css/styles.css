@@ -7,8 +7,8 @@
 
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-    background-color: #1a1a2e;
-    color: #e0e0e0;
+    background-color: #ffffff;
+    color: #333333;
     overflow: hidden;
     height: 100vh;
 }
@@ -25,8 +25,8 @@ body {
     align-items: center;
     gap: 20px;
     padding: 10px 20px;
-    background: linear-gradient(180deg, #2d2d44 0%, #1f1f35 100%);
-    border-bottom: 1px solid #3d3d5c;
+    background: linear-gradient(180deg, #f8f9fa 0%, #e9ecef 100%);
+    border-bottom: 1px solid #dee2e6;
     flex-wrap: wrap;
     z-index: 100;
 }
@@ -38,13 +38,13 @@ body {
 }
 
 .toolbar-section h3 {
-    color: #7c8dff;
+    color: #6c5ce7;
     font-size: 18px;
     font-weight: 600;
 }
 
 .toolbar-section.tools {
-    background: rgba(0, 0, 0, 0.2);
+    background: rgba(108, 92, 231, 0.08);
     padding: 5px 10px;
     border-radius: 8px;
 }
@@ -55,13 +55,13 @@ body {
 
 .toolbar-section.colors label {
     font-size: 12px;
-    color: #aaa;
+    color: #666;
 }
 
 .toolbar-section.colors input[type="color"] {
     width: 30px;
     height: 30px;
-    border: none;
+    border: 1px solid #dee2e6;
     border-radius: 4px;
     cursor: pointer;
     background: none;
@@ -79,22 +79,22 @@ body {
     background: transparent;
     border: 1px solid transparent;
     border-radius: 6px;
-    color: #ccc;
+    color: #555;
     cursor: pointer;
     font-size: 13px;
     transition: all 0.2s ease;
 }
 
 .tool-btn:hover {
-    background: rgba(124, 141, 255, 0.1);
-    border-color: rgba(124, 141, 255, 0.3);
-    color: #fff;
+    background: rgba(108, 92, 231, 0.1);
+    border-color: rgba(108, 92, 231, 0.3);
+    color: #333;
 }
 
 .tool-btn.active {
-    background: rgba(124, 141, 255, 0.2);
-    border-color: #7c8dff;
-    color: #7c8dff;
+    background: rgba(108, 92, 231, 0.15);
+    border-color: #6c5ce7;
+    color: #6c5ce7;
 }
 
 .tool-btn .icon {
@@ -103,27 +103,28 @@ body {
 
 .action-btn {
     padding: 8px 16px;
-    background: linear-gradient(180deg, #4a5568 0%, #2d3748 100%);
-    border: 1px solid #4a5568;
+    background: linear-gradient(180deg, #ffffff 0%, #f1f3f4 100%);
+    border: 1px solid #dee2e6;
     border-radius: 6px;
-    color: #fff;
+    color: #333;
     cursor: pointer;
     font-size: 13px;
     transition: all 0.2s ease;
 }
 
 .action-btn:hover {
-    background: linear-gradient(180deg, #5a6578 0%, #3d4758 100%);
-    border-color: #7c8dff;
+    background: linear-gradient(180deg, #f8f9fa 0%, #e9ecef 100%);
+    border-color: #6c5ce7;
 }
 
 .action-btn.danger {
-    background: linear-gradient(180deg, #e53e3e 0%, #c53030 100%);
-    border-color: #e53e3e;
+    background: linear-gradient(180deg, #ff7675 0%, #d63031 100%);
+    border-color: #d63031;
+    color: #fff;
 }
 
 .action-btn.danger:hover {
-    background: linear-gradient(180deg, #f56565 0%, #e53e3e 100%);
+    background: linear-gradient(180deg, #ff8584 0%, #e74c3c 100%);
 }
 
 .user-section {
@@ -133,18 +134,18 @@ body {
 
 #userStatus {
     font-size: 12px;
-    color: #888;
+    color: #666;
 }
 
-/* Canvas Container */
+/* Canvas Container - White background with light grid */
 #canvasContainer {
     flex: 1;
     position: relative;
     overflow: hidden;
-    background-color: #16162a;
+    background-color: #ffffff;
     background-image:
-        linear-gradient(rgba(124, 141, 255, 0.03) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(124, 141, 255, 0.03) 1px, transparent 1px);
+        linear-gradient(rgba(108, 92, 231, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(108, 92, 231, 0.05) 1px, transparent 1px);
     background-size: 20px 20px;
 }
 
@@ -161,25 +162,26 @@ body {
     left: 10px;
     top: 80px;
     width: 180px;
-    background: rgba(30, 30, 50, 0.95);
-    border: 1px solid #3d3d5c;
+    background: rgba(255, 255, 255, 0.98);
+    border: 1px solid #dee2e6;
     border-radius: 10px;
     padding: 15px;
     z-index: 50;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
 }
 
 #shortcutsPanel h4 {
-    color: #7c8dff;
+    color: #6c5ce7;
     font-size: 14px;
     margin-bottom: 10px;
     padding-bottom: 8px;
-    border-bottom: 1px solid #3d3d5c;
+    border-bottom: 1px solid #e9ecef;
 }
 
 #shortcutsPanel ul {
     list-style: none;
     font-size: 12px;
+    color: #555;
 }
 
 #shortcutsPanel li {
@@ -190,21 +192,21 @@ body {
 }
 
 #shortcutsPanel kbd {
-    background: #2d2d44;
+    background: #f1f3f4;
     padding: 2px 6px;
     border-radius: 4px;
     font-family: monospace;
     font-size: 11px;
-    color: #7c8dff;
-    border: 1px solid #4d4d6c;
+    color: #6c5ce7;
+    border: 1px solid #dee2e6;
 }
 
 #shortcutsPanel .tip {
     margin-top: 12px;
     padding-top: 10px;
-    border-top: 1px solid #3d3d5c;
+    border-top: 1px solid #e9ecef;
     font-size: 11px;
-    color: #88cc88;
+    color: #00b894;
     font-style: italic;
 }
 
@@ -214,20 +216,20 @@ body {
     right: 10px;
     top: 80px;
     width: 220px;
-    background: rgba(30, 30, 50, 0.95);
-    border: 1px solid #3d3d5c;
+    background: rgba(255, 255, 255, 0.98);
+    border: 1px solid #dee2e6;
     border-radius: 10px;
     padding: 15px;
     z-index: 50;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
 }
 
 #propertiesPanel h4 {
-    color: #7c8dff;
+    color: #6c5ce7;
     font-size: 14px;
     margin-bottom: 10px;
     padding-bottom: 8px;
-    border-bottom: 1px solid #3d3d5c;
+    border-bottom: 1px solid #e9ecef;
 }
 
 #noSelection p {
@@ -244,7 +246,7 @@ body {
 .property-group label {
     display: block;
     font-size: 11px;
-    color: #aaa;
+    color: #666;
     margin-bottom: 4px;
 }
 
@@ -253,10 +255,10 @@ body {
 .property-group textarea {
     width: 100%;
     padding: 8px;
-    background: #1a1a2e;
-    border: 1px solid #3d3d5c;
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
     border-radius: 4px;
-    color: #fff;
+    color: #333;
     font-size: 13px;
 }
 
@@ -264,13 +266,14 @@ body {
 .property-group input[type="number"]:focus,
 .property-group textarea:focus {
     outline: none;
-    border-color: #7c8dff;
+    border-color: #6c5ce7;
+    background: #fff;
 }
 
 .property-group input[type="color"] {
     width: 100%;
     height: 35px;
-    border: none;
+    border: 1px solid #dee2e6;
     border-radius: 4px;
     cursor: pointer;
     background: none;
@@ -292,7 +295,7 @@ body {
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.7);
+    background: rgba(0, 0, 0, 0.4);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -300,21 +303,22 @@ body {
 }
 
 .modal-content {
-    background: #2d2d44;
-    border: 1px solid #3d3d5c;
+    background: #ffffff;
+    border: 1px solid #dee2e6;
     border-radius: 12px;
     padding: 25px;
     min-width: 400px;
     max-width: 500px;
     max-height: 70vh;
     overflow-y: auto;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
 }
 
 .modal-content h3 {
-    color: #7c8dff;
+    color: #6c5ce7;
     margin-bottom: 20px;
     padding-bottom: 10px;
-    border-bottom: 1px solid #3d3d5c;
+    border-bottom: 1px solid #e9ecef;
 }
 
 .modal-actions {
@@ -334,7 +338,8 @@ body {
     justify-content: space-between;
     align-items: center;
     padding: 12px;
-    background: rgba(0, 0, 0, 0.2);
+    background: #f8f9fa;
+    border: 1px solid transparent;
     border-radius: 6px;
     margin-bottom: 8px;
     cursor: pointer;
@@ -342,12 +347,13 @@ body {
 }
 
 .mindmap-item:hover {
-    background: rgba(124, 141, 255, 0.1);
-    border: 1px solid rgba(124, 141, 255, 0.3);
+    background: rgba(108, 92, 231, 0.08);
+    border-color: rgba(108, 92, 231, 0.3);
 }
 
 .mindmap-item .name {
     font-weight: 500;
+    color: #333;
 }
 
 .mindmap-item .date {
@@ -358,7 +364,7 @@ body {
 .mindmap-item .delete-btn {
     background: transparent;
     border: none;
-    color: #e53e3e;
+    color: #d63031;
     cursor: pointer;
     font-size: 16px;
     padding: 4px 8px;
@@ -366,14 +372,14 @@ body {
 }
 
 .mindmap-item .delete-btn:hover {
-    background: rgba(229, 62, 62, 0.2);
+    background: rgba(214, 48, 49, 0.1);
 }
 
 /* Selection Box */
 .selection-box {
     position: absolute;
-    border: 2px dashed #7c8dff;
-    background: rgba(124, 141, 255, 0.1);
+    border: 2px dashed #6c5ce7;
+    background: rgba(108, 92, 231, 0.1);
     pointer-events: none;
 }
 
@@ -388,13 +394,14 @@ body {
     padding: 8px;
     font-size: 14px;
     font-family: inherit;
-    border: 2px solid #7c8dff;
+    border: 2px solid #6c5ce7;
     border-radius: 4px;
-    background: rgba(26, 26, 46, 0.95);
-    color: #fff;
+    background: rgba(255, 255, 255, 0.98);
+    color: #333;
     resize: both;
     min-width: 100px;
     min-height: 40px;
+    text-align: center;
 }
 
 /* Connection Points */
@@ -402,7 +409,7 @@ body {
     position: absolute;
     width: 10px;
     height: 10px;
-    background: #7c8dff;
+    background: #6c5ce7;
     border: 2px solid #fff;
     border-radius: 50%;
     cursor: crosshair;
@@ -416,16 +423,16 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-    background: #1a1a2e;
+    background: #f1f3f4;
 }
 
 ::-webkit-scrollbar-thumb {
-    background: #3d3d5c;
+    background: #ced4da;
     border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: #4d4d6c;
+    background: #adb5bd;
 }
 
 /* Responsive adjustments */

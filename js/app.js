@@ -8,25 +8,46 @@ class MindmapApp {
 
         // State
         this.elements = [];
+        this.connections = []; // Store connections between shapes
         this.selectedElements = [];
         this.currentTool = 'select';
         this.isDrawing = false;
         this.isDragging = false;
         this.isResizing = false;
         this.isPanning = false;
+        this.isConnecting = false;
         this.drawStart = { x: 0, y: 0 };
         this.dragOffset = { x: 0, y: 0 };
         this.resizeHandle = null;
+        this.connectionStart = null;
 
         // Pan and Zoom
         this.panOffset = { x: 0, y: 0 };
         this.zoom = 1;
 
-        // Drawing settings
-        this.fillColor = '#4a90d9';
-        this.strokeColor = '#2c5282';
+        // Pastel colors palette
+        this.pastelColors = [
+            '#FFB3BA', // Pastel Pink
+            '#FFDFBA', // Pastel Orange
+            '#FFFFBA', // Pastel Yellow
+            '#BAFFC9', // Pastel Green
+            '#BAE1FF', // Pastel Blue
+            '#E0BBE4', // Pastel Purple
+            '#D4F0F0', // Pastel Cyan
+            '#FCE4EC', // Light Pink
+            '#E8F5E9', // Light Green
+            '#FFF3E0', // Light Orange
+        ];
+
+        // Default drawing settings - pastel colors
+        this.fillColor = '#BAE1FF';
+        this.strokeColor = '#5DADE2';
         this.strokeWidth = 2;
         this.fontSize = 14;
+
+        // Default shape sizes
+        this.defaultWidth = 120;
+        this.defaultHeight = 80;
 
         // Clipboard
         this.clipboard = [];
@@ -38,9 +59,6 @@ class MindmapApp {
 
         // Temp drawing element
         this.tempElement = null;
-
-        // Connection drawing
-        this.connectionStart = null;
 
         // Initialize
         this.init();
@@ -55,6 +73,21 @@ class MindmapApp {
         this.setupAuth();
         this.saveState();
         this.render();
+    }
+
+    // Get a random pastel color
+    getRandomPastelColor() {
+        return this.pastelColors[Math.floor(Math.random() * this.pastelColors.length)];
+    }
+
+    // Get stroke color for a fill color (darker version)
+    getStrokeForFill(fillColor) {
+        // Convert hex to RGB, darken, and convert back
+        const hex = fillColor.replace('#', '');
+        const r = Math.max(0, parseInt(hex.substr(0, 2), 16) - 40);
+        const g = Math.max(0, parseInt(hex.substr(2, 2), 16) - 40);
+        const b = Math.max(0, parseInt(hex.substr(4, 2), 16) - 40);
+        return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
     }
 
     setupCanvas() {
@@ -106,8 +139,10 @@ class MindmapApp {
 
         if (this.currentTool === 'select') {
             this.handleSelectMouseDown(pos, e);
+        } else if (this.currentTool === 'arrow') {
+            this.handleArrowMouseDown(pos, e);
         } else {
-            this.handleDrawMouseDown(pos);
+            this.handleShapeMouseDown(pos);
         }
     }
 
@@ -117,6 +152,14 @@ class MindmapApp {
         if (handle) {
             this.isResizing = true;
             this.resizeHandle = handle;
+            return;
+        }
+
+        // Check if clicking on a connection point
+        const connectionPoint = this.getConnectionPointAtPosition(pos);
+        if (connectionPoint) {
+            this.isConnecting = true;
+            this.connectionStart = connectionPoint;
             return;
         }
 
@@ -150,10 +193,11 @@ class MindmapApp {
                 y2: el.y2
             }));
         } else {
-            // Start selection box
+            // Clicked on empty canvas - deselect all
             if (!e.ctrlKey && !e.metaKey) {
                 this.selectedElements = [];
             }
+            // Start selection box
             this.isDrawing = true;
             this.drawStart = pos;
         }
@@ -162,12 +206,48 @@ class MindmapApp {
         this.render();
     }
 
-    handleDrawMouseDown(pos) {
-        this.isDrawing = true;
-        this.drawStart = pos;
+    handleArrowMouseDown(pos, e) {
+        // Check if clicking on a shape to start connection
+        const clickedElement = this.getElementAtPosition(pos);
 
-        // Create temporary element
-        this.tempElement = this.createElement(this.currentTool, pos.x, pos.y, pos.x, pos.y);
+        if (clickedElement && clickedElement.type !== 'arrow' && clickedElement.type !== 'line') {
+            this.isConnecting = true;
+            this.connectionStart = {
+                element: clickedElement,
+                pos: pos
+            };
+        } else {
+            // Start free-form arrow
+            this.isDrawing = true;
+            this.drawStart = pos;
+            this.tempElement = this.createElement('arrow', pos.x, pos.y, pos.x, pos.y);
+        }
+    }
+
+    handleShapeMouseDown(pos) {
+        // Single click to place a default-sized shape
+        const fillColor = this.getRandomPastelColor();
+        const strokeColor = this.getStrokeForFill(fillColor);
+
+        const element = this.createElement(
+            this.currentTool,
+            pos.x - this.defaultWidth / 2,
+            pos.y - this.defaultHeight / 2,
+            pos.x + this.defaultWidth / 2,
+            pos.y + this.defaultHeight / 2
+        );
+
+        element.fillColor = fillColor;
+        element.strokeColor = strokeColor;
+
+        this.elements.push(element);
+        this.selectedElements = [element];
+        this.saveState();
+        this.render();
+        this.updatePropertyPanel();
+
+        // Switch back to select tool after placing
+        this.setTool('select');
     }
 
     handleMouseMove(e) {
@@ -180,6 +260,13 @@ class MindmapApp {
             this.panOffset.y += dy;
             this.panStart = { x: e.clientX, y: e.clientY };
             this.render();
+            return;
+        }
+
+        if (this.isConnecting && this.connectionStart) {
+            this.render();
+            // Draw temporary connection line
+            this.drawTempConnection(this.connectionStart, pos);
             return;
         }
 
@@ -202,6 +289,8 @@ class MindmapApp {
                 }
             });
 
+            // Update all connections involving moved elements
+            this.updateConnections();
             this.render();
             return;
         }
@@ -229,13 +318,30 @@ class MindmapApp {
 
         if (this.isPanning) {
             this.isPanning = false;
-            this.canvas.style.cursor = 'crosshair';
+            this.canvas.style.cursor = this.currentTool === 'select' ? 'default' : 'crosshair';
+            return;
+        }
+
+        if (this.isConnecting && this.connectionStart) {
+            // Check if ending on a shape
+            const endElement = this.getElementAtPosition(pos);
+
+            if (endElement && endElement !== this.connectionStart.element &&
+                endElement.type !== 'arrow' && endElement.type !== 'line') {
+                // Create connection between shapes
+                this.createConnection(this.connectionStart.element, endElement);
+            }
+
+            this.isConnecting = false;
+            this.connectionStart = null;
+            this.render();
             return;
         }
 
         if (this.isResizing) {
             this.isResizing = false;
             this.resizeHandle = null;
+            this.updateConnections();
             this.saveState();
             return;
         }
@@ -265,11 +371,14 @@ class MindmapApp {
         const pos = this.getMousePos(e);
         const element = this.getElementAtPosition(pos);
 
-        if (element) {
+        if (element && element.type !== 'arrow' && element.type !== 'line') {
             this.editElementText(element);
         } else if (this.currentTool === 'select') {
             // Create text element on double click
-            const textElement = this.createElement('text', pos.x, pos.y, pos.x + 100, pos.y + 30);
+            const fillColor = this.getRandomPastelColor();
+            const textElement = this.createElement('text', pos.x - 50, pos.y - 20, pos.x + 50, pos.y + 20);
+            textElement.fillColor = fillColor;
+            textElement.strokeColor = this.getStrokeForFill(fillColor);
             this.elements.push(textElement);
             this.selectedElements = [textElement];
             this.saveState();
@@ -291,6 +400,188 @@ class MindmapApp {
 
         this.zoom = newZoom;
         this.render();
+    }
+
+    // Connection Management
+    createConnection(fromElement, toElement) {
+        // Check if connection already exists
+        const exists = this.connections.some(c =>
+            (c.from === fromElement && c.to === toElement) ||
+            (c.from === toElement && c.to === fromElement)
+        );
+
+        if (!exists) {
+            this.connections.push({
+                from: fromElement,
+                to: toElement,
+                strokeColor: '#666666',
+                strokeWidth: 2
+            });
+            this.saveState();
+        }
+    }
+
+    updateConnections() {
+        // Connections auto-update because they reference element objects directly
+        // No action needed - render will recalculate paths
+    }
+
+    removeConnectionsForElement(element) {
+        this.connections = this.connections.filter(c =>
+            c.from !== element && c.to !== element
+        );
+    }
+
+    drawTempConnection(start, endPos) {
+        const startCenter = this.getElementCenter(start.element);
+
+        this.ctx.save();
+        this.ctx.translate(this.panOffset.x, this.panOffset.y);
+        this.ctx.scale(this.zoom, this.zoom);
+
+        this.ctx.strokeStyle = '#6c5ce7';
+        this.ctx.lineWidth = 2;
+        this.ctx.setLineDash([5, 5]);
+
+        this.ctx.beginPath();
+        this.ctx.moveTo(startCenter.x, startCenter.y);
+        this.ctx.lineTo(endPos.x, endPos.y);
+        this.ctx.stroke();
+
+        this.ctx.restore();
+    }
+
+    // Get orthogonal path between two elements (Z-shaped arrow)
+    getOrthogonalPath(fromElement, toElement) {
+        const fromCenter = this.getElementCenter(fromElement);
+        const toCenter = this.getElementCenter(toElement);
+        const fromBounds = this.getElementBounds(fromElement);
+        const toBounds = this.getElementBounds(toElement);
+
+        // Determine best connection points
+        const dx = toCenter.x - fromCenter.x;
+        const dy = toCenter.y - fromCenter.y;
+
+        let startPoint, endPoint;
+        let path = [];
+
+        // Determine which sides to connect based on relative positions
+        if (Math.abs(dx) > Math.abs(dy)) {
+            // Horizontal dominant - connect left/right sides
+            if (dx > 0) {
+                // To is to the right
+                startPoint = { x: fromBounds.x + fromBounds.width, y: fromCenter.y };
+                endPoint = { x: toBounds.x, y: toCenter.y };
+            } else {
+                // To is to the left
+                startPoint = { x: fromBounds.x, y: fromCenter.y };
+                endPoint = { x: toBounds.x + toBounds.width, y: toCenter.y };
+            }
+
+            // Create Z-path (horizontal -> vertical -> horizontal)
+            const midX = (startPoint.x + endPoint.x) / 2;
+            path = [
+                startPoint,
+                { x: midX, y: startPoint.y },
+                { x: midX, y: endPoint.y },
+                endPoint
+            ];
+        } else {
+            // Vertical dominant - connect top/bottom sides
+            if (dy > 0) {
+                // To is below
+                startPoint = { x: fromCenter.x, y: fromBounds.y + fromBounds.height };
+                endPoint = { x: toCenter.x, y: toBounds.y };
+            } else {
+                // To is above
+                startPoint = { x: fromCenter.x, y: fromBounds.y };
+                endPoint = { x: toCenter.x, y: toBounds.y + toBounds.height };
+            }
+
+            // Create Z-path (vertical -> horizontal -> vertical)
+            const midY = (startPoint.y + endPoint.y) / 2;
+            path = [
+                startPoint,
+                { x: startPoint.x, y: midY },
+                { x: endPoint.x, y: midY },
+                endPoint
+            ];
+        }
+
+        return path;
+    }
+
+    drawConnection(connection) {
+        const path = this.getOrthogonalPath(connection.from, connection.to);
+
+        if (path.length < 2) return;
+
+        this.ctx.save();
+        this.ctx.strokeStyle = connection.strokeColor || '#666666';
+        this.ctx.lineWidth = connection.strokeWidth || 2;
+        this.ctx.lineCap = 'round';
+        this.ctx.lineJoin = 'round';
+
+        // Draw the path
+        this.ctx.beginPath();
+        this.ctx.moveTo(path[0].x, path[0].y);
+        for (let i = 1; i < path.length; i++) {
+            this.ctx.lineTo(path[i].x, path[i].y);
+        }
+        this.ctx.stroke();
+
+        // Draw arrowhead at the end
+        const lastPoint = path[path.length - 1];
+        const prevPoint = path[path.length - 2];
+        this.drawArrowhead(prevPoint, lastPoint);
+
+        this.ctx.restore();
+    }
+
+    drawArrowhead(from, to) {
+        const angle = Math.atan2(to.y - from.y, to.x - from.x);
+        const headLength = 12;
+
+        this.ctx.beginPath();
+        this.ctx.moveTo(to.x, to.y);
+        this.ctx.lineTo(
+            to.x - headLength * Math.cos(angle - Math.PI / 6),
+            to.y - headLength * Math.sin(angle - Math.PI / 6)
+        );
+        this.ctx.moveTo(to.x, to.y);
+        this.ctx.lineTo(
+            to.x - headLength * Math.cos(angle + Math.PI / 6),
+            to.y - headLength * Math.sin(angle + Math.PI / 6)
+        );
+        this.ctx.stroke();
+    }
+
+    getConnectionPointAtPosition(pos) {
+        for (let element of this.selectedElements) {
+            if (element.type === 'arrow' || element.type === 'line') continue;
+
+            const points = this.getConnectionPoints(element);
+            for (let point of points) {
+                const dist = Math.sqrt(Math.pow(pos.x - point.x, 2) + Math.pow(pos.y - point.y, 2));
+                if (dist < 10) {
+                    return { element, point };
+                }
+            }
+        }
+        return null;
+    }
+
+    getConnectionPoints(element) {
+        const bounds = this.getElementBounds(element);
+        const cx = bounds.x + bounds.width / 2;
+        const cy = bounds.y + bounds.height / 2;
+
+        return [
+            { x: cx, y: bounds.y, side: 'top' },
+            { x: bounds.x + bounds.width, y: cy, side: 'right' },
+            { x: cx, y: bounds.y + bounds.height, side: 'bottom' },
+            { x: bounds.x, y: cy, side: 'left' }
+        ];
     }
 
     // Keyboard Handler
@@ -441,8 +732,8 @@ class MindmapApp {
 
                 const imageElement = {
                     type: 'image',
-                    x: x,
-                    y: y,
+                    x: x - width / 2,
+                    y: y - height / 2,
                     width: width,
                     height: height,
                     imageData: event.target.result,
@@ -463,13 +754,17 @@ class MindmapApp {
 
     // Element Creation
     createElement(type, x1, y1, x2, y2) {
+        const fillColor = this.getRandomPastelColor();
+        const strokeColor = this.getStrokeForFill(fillColor);
+
         const baseElement = {
             type: type,
-            fillColor: this.fillColor,
-            strokeColor: this.strokeColor,
+            fillColor: fillColor,
+            strokeColor: strokeColor,
             strokeWidth: this.strokeWidth,
             text: '',
-            fontSize: this.fontSize
+            fontSize: this.fontSize,
+            textAlign: 'center'
         };
 
         switch (type) {
@@ -482,8 +777,8 @@ class MindmapApp {
                     ...baseElement,
                     x: Math.min(x1, x2),
                     y: Math.min(y1, y2),
-                    width: Math.abs(x2 - x1),
-                    height: Math.abs(y2 - y1)
+                    width: Math.abs(x2 - x1) || this.defaultWidth,
+                    height: Math.abs(y2 - y1) || this.defaultHeight
                 };
             case 'arrow':
             case 'line':
@@ -492,7 +787,9 @@ class MindmapApp {
                     x: x1,
                     y: y1,
                     x2: x2,
-                    y2: y2
+                    y2: y2,
+                    fillColor: 'transparent',
+                    strokeColor: '#666666'
                 };
             default:
                 return baseElement;
@@ -545,6 +842,14 @@ class MindmapApp {
         this.updatePropertyPanel();
     }
 
+    getElementCenter(element) {
+        const bounds = this.getElementBounds(element);
+        return {
+            x: bounds.x + bounds.width / 2,
+            y: bounds.y + bounds.height / 2
+        };
+    }
+
     // Rendering
     render() {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
@@ -553,6 +858,14 @@ class MindmapApp {
         this.ctx.save();
         this.ctx.translate(this.panOffset.x, this.panOffset.y);
         this.ctx.scale(this.zoom, this.zoom);
+
+        // Draw all connections first (behind shapes)
+        this.connections.forEach(connection => {
+            // Check if both elements still exist
+            if (this.elements.includes(connection.from) && this.elements.includes(connection.to)) {
+                this.drawConnection(connection);
+            }
+        });
 
         // Draw all elements
         this.elements.forEach(element => {
@@ -700,14 +1013,15 @@ class MindmapApp {
     drawText(element) {
         const { x, y, width, height, text, fontSize } = element;
 
-        // Draw background
-        this.ctx.fillStyle = element.fillColor || 'transparent';
+        // Draw background if has fill color
         if (element.fillColor && element.fillColor !== 'transparent') {
+            this.ctx.fillStyle = element.fillColor;
             this.ctx.fillRect(x, y, width, height);
+            this.ctx.strokeRect(x, y, width, height);
         }
 
-        // Draw text
-        this.ctx.fillStyle = element.strokeColor || '#ffffff';
+        // Draw text - always centered
+        this.ctx.fillStyle = '#333333';
         this.ctx.font = `${fontSize || 14}px -apple-system, BlinkMacSystemFont, sans-serif`;
         this.ctx.textAlign = 'center';
         this.ctx.textBaseline = 'middle';
@@ -738,7 +1052,8 @@ class MindmapApp {
     drawElementText(element) {
         if (!element.text) return;
 
-        this.ctx.fillStyle = '#ffffff';
+        // Dark text for contrast on pastel backgrounds
+        this.ctx.fillStyle = '#333333';
         this.ctx.font = `${element.fontSize || 14}px -apple-system, BlinkMacSystemFont, sans-serif`;
         this.ctx.textAlign = 'center';
         this.ctx.textBaseline = 'middle';
@@ -759,7 +1074,7 @@ class MindmapApp {
         const bounds = this.getElementBounds(element);
         const padding = 5;
 
-        this.ctx.strokeStyle = '#7c8dff';
+        this.ctx.strokeStyle = '#6c5ce7';
         this.ctx.lineWidth = 2;
         this.ctx.setLineDash([5, 5]);
         this.ctx.strokeRect(
@@ -774,7 +1089,7 @@ class MindmapApp {
         const handleSize = 8;
         const handles = this.getResizeHandles(element);
 
-        this.ctx.fillStyle = '#7c8dff';
+        this.ctx.fillStyle = '#6c5ce7';
         handles.forEach(handle => {
             this.ctx.fillRect(
                 handle.x - handleSize / 2,
@@ -783,6 +1098,17 @@ class MindmapApp {
                 handleSize
             );
         });
+
+        // Draw connection points for shapes
+        if (element.type !== 'arrow' && element.type !== 'line') {
+            const connectionPoints = this.getConnectionPoints(element);
+            this.ctx.fillStyle = '#00b894';
+            connectionPoints.forEach(point => {
+                this.ctx.beginPath();
+                this.ctx.arc(point.x, point.y, 5, 0, Math.PI * 2);
+                this.ctx.fill();
+            });
+        }
     }
 
     drawSelectionBox(start, end) {
@@ -795,8 +1121,8 @@ class MindmapApp {
         this.ctx.translate(this.panOffset.x, this.panOffset.y);
         this.ctx.scale(this.zoom, this.zoom);
 
-        this.ctx.strokeStyle = '#7c8dff';
-        this.ctx.fillStyle = 'rgba(124, 141, 255, 0.1)';
+        this.ctx.strokeStyle = '#6c5ce7';
+        this.ctx.fillStyle = 'rgba(108, 92, 231, 0.1)';
         this.ctx.lineWidth = 1;
         this.ctx.setLineDash([5, 5]);
 
@@ -819,8 +1145,8 @@ class MindmapApp {
             return {
                 x: Math.min(element.x, element.x2),
                 y: Math.min(element.y, element.y2),
-                width: Math.abs(element.x2 - element.x),
-                height: Math.abs(element.y2 - element.y)
+                width: Math.abs(element.x2 - element.x) || 10,
+                height: Math.abs(element.y2 - element.y) || 10
             };
         }
         return {
@@ -947,11 +1273,11 @@ class MindmapApp {
         }
 
         // Minimum size
-        if (newWidth > 10) {
+        if (newWidth > 20) {
             element.x = newX;
             element.width = newWidth;
         }
-        if (newHeight > 10) {
+        if (newHeight > 20) {
             element.y = newY;
             element.height = newHeight;
         }
@@ -985,6 +1311,11 @@ class MindmapApp {
         const y1 = Math.min(start.y, end.y);
         const x2 = Math.max(start.x, end.x);
         const y2 = Math.max(start.y, end.y);
+
+        // Only select if box is bigger than a click
+        if (Math.abs(x2 - x1) < 5 && Math.abs(y2 - y1) < 5) {
+            return;
+        }
 
         this.elements.forEach(element => {
             const bounds = this.getElementBounds(element);
@@ -1078,11 +1409,19 @@ class MindmapApp {
         // Remove any future states
         this.history = this.history.slice(0, this.historyIndex + 1);
 
-        // Save current state
-        const state = this.elements.map(el => ({
-            ...el,
-            image: undefined
-        }));
+        // Save current state (elements and connections)
+        const state = {
+            elements: this.elements.map(el => ({
+                ...el,
+                image: undefined
+            })),
+            connections: this.connections.map(c => ({
+                fromIndex: this.elements.indexOf(c.from),
+                toIndex: this.elements.indexOf(c.to),
+                strokeColor: c.strokeColor,
+                strokeWidth: c.strokeWidth
+            }))
+        };
 
         this.history.push(JSON.stringify(state));
         this.historyIndex = this.history.length - 1;
@@ -1111,8 +1450,8 @@ class MindmapApp {
     loadState(stateJson) {
         const state = JSON.parse(stateJson);
 
-        // Recreate images
-        this.elements = state.map(el => {
+        // Recreate elements
+        this.elements = state.elements.map(el => {
             if (el.type === 'image' && el.imageData) {
                 const img = new Image();
                 img.src = el.imageData;
@@ -1120,6 +1459,16 @@ class MindmapApp {
             }
             return el;
         });
+
+        // Recreate connections
+        this.connections = state.connections
+            .filter(c => c.fromIndex >= 0 && c.toIndex >= 0)
+            .map(c => ({
+                from: this.elements[c.fromIndex],
+                to: this.elements[c.toIndex],
+                strokeColor: c.strokeColor,
+                strokeWidth: c.strokeWidth
+            }));
 
         this.selectedElements = [];
         this.render();
@@ -1129,6 +1478,11 @@ class MindmapApp {
     // Element Operations
     deleteSelected() {
         if (this.selectedElements.length === 0) return;
+
+        // Remove connections for deleted elements
+        this.selectedElements.forEach(el => {
+            this.removeConnectionsForElement(el);
+        });
 
         this.elements = this.elements.filter(el => !this.selectedElements.includes(el));
         this.selectedElements = [];
@@ -1146,6 +1500,7 @@ class MindmapApp {
     clearCanvas() {
         if (confirm('Are you sure you want to clear the canvas?')) {
             this.elements = [];
+            this.connections = [];
             this.selectedElements = [];
             this.saveState();
             this.render();
@@ -1170,6 +1525,7 @@ class MindmapApp {
         textarea.style.width = Math.max(bounds.width, 100) + 'px';
         textarea.style.height = Math.max(bounds.height, 40) + 'px';
         textarea.style.fontSize = (element.fontSize || 14) + 'px';
+        textarea.style.textAlign = 'center';
 
         overlay.innerHTML = '';
         overlay.appendChild(textarea);
@@ -1213,14 +1569,28 @@ class MindmapApp {
         // Color pickers
         document.getElementById('fillColor').addEventListener('input', (e) => {
             this.fillColor = e.target.value;
+            this.selectedElements.forEach(el => {
+                if (el.type !== 'arrow' && el.type !== 'line') {
+                    el.fillColor = e.target.value;
+                }
+            });
+            this.render();
         });
 
         document.getElementById('strokeColor').addEventListener('input', (e) => {
             this.strokeColor = e.target.value;
+            this.selectedElements.forEach(el => {
+                el.strokeColor = e.target.value;
+            });
+            this.render();
         });
 
         document.getElementById('strokeWidth').addEventListener('input', (e) => {
             this.strokeWidth = parseInt(e.target.value);
+            this.selectedElements.forEach(el => {
+                el.strokeWidth = parseInt(e.target.value);
+            });
+            this.render();
         });
 
         // Action buttons
@@ -1331,8 +1701,8 @@ class MindmapApp {
         const element = this.selectedElements[0];
 
         document.getElementById('elementText').value = element.text || '';
-        document.getElementById('elementFill').value = element.fillColor || '#4a90d9';
-        document.getElementById('elementStroke').value = element.strokeColor || '#2c5282';
+        document.getElementById('elementFill').value = element.fillColor || '#BAE1FF';
+        document.getElementById('elementStroke').value = element.strokeColor || '#5DADE2';
         document.getElementById('elementStrokeWidth').value = element.strokeWidth || 2;
         document.getElementById('elementFontSize').value = element.fontSize || 14;
     }
@@ -1386,10 +1756,18 @@ class MindmapApp {
         }
 
         try {
-            const data = this.elements.map(el => ({
-                ...el,
-                image: undefined
-            }));
+            const data = {
+                elements: this.elements.map(el => ({
+                    ...el,
+                    image: undefined
+                })),
+                connections: this.connections.map(c => ({
+                    fromIndex: this.elements.indexOf(c.from),
+                    toIndex: this.elements.indexOf(c.to),
+                    strokeColor: c.strokeColor,
+                    strokeWidth: c.strokeWidth
+                }))
+            };
 
             await FirebaseService.saveMindmap(name, data);
             document.getElementById('saveModal').style.display = 'none';
@@ -1436,7 +1814,7 @@ class MindmapApp {
                         <div class="name">${mindmap.name}</div>
                         <div class="date">${mindmap.updatedAt.toLocaleDateString()}</div>
                     </div>
-                    <button class="delete-btn" title="Delete">🗑️</button>
+                    <button class="delete-btn" title="Delete">X</button>
                 `;
 
                 item.querySelector('.name').addEventListener('click', () => {
@@ -1463,7 +1841,18 @@ class MindmapApp {
         try {
             const mindmap = await FirebaseService.loadMindmap(id);
 
-            this.elements = mindmap.data.map(el => {
+            // Handle both old format (array) and new format (object with elements/connections)
+            let elementsData, connectionsData;
+
+            if (Array.isArray(mindmap.data)) {
+                elementsData = mindmap.data;
+                connectionsData = [];
+            } else {
+                elementsData = mindmap.data.elements || [];
+                connectionsData = mindmap.data.connections || [];
+            }
+
+            this.elements = elementsData.map(el => {
                 if (el.type === 'image' && el.imageData) {
                     const img = new Image();
                     img.src = el.imageData;
@@ -1471,6 +1860,18 @@ class MindmapApp {
                 }
                 return el;
             });
+
+            // Recreate connections
+            this.connections = connectionsData
+                .filter(c => c.fromIndex >= 0 && c.toIndex >= 0 &&
+                            c.fromIndex < this.elements.length &&
+                            c.toIndex < this.elements.length)
+                .map(c => ({
+                    from: this.elements[c.fromIndex],
+                    to: this.elements[c.toIndex],
+                    strokeColor: c.strokeColor || '#666666',
+                    strokeWidth: c.strokeWidth || 2
+                }));
 
             this.selectedElements = [];
             this.history = [];
@@ -1501,6 +1902,13 @@ class MindmapApp {
             maxY = Math.max(maxY, bounds.y + bounds.height);
         });
 
+        if (this.elements.length === 0) {
+            minX = 0;
+            minY = 0;
+            maxX = 400;
+            maxY = 300;
+        }
+
         const padding = 50;
         const width = maxX - minX + padding * 2;
         const height = maxY - minY + padding * 2;
@@ -1515,9 +1923,17 @@ class MindmapApp {
         // Translate to fit content
         tempCtx.translate(-minX + padding, -minY + padding);
 
-        // Draw elements
+        // Draw connections
         const originalCtx = this.ctx;
         this.ctx = tempCtx;
+
+        this.connections.forEach(connection => {
+            if (this.elements.includes(connection.from) && this.elements.includes(connection.to)) {
+                this.drawConnection(connection);
+            }
+        });
+
+        // Draw elements
         this.elements.forEach(el => this.drawElement(el));
         this.ctx = originalCtx;
 
