@@ -45,6 +45,63 @@ const FirebaseService = {
         return auth.signInWithPopup(provider);
     },
 
+    // Sign up with email and password
+    async signUpWithEmail(email, password, displayName) {
+        if (!auth) {
+            throw new Error('Firebase not initialized');
+        }
+
+        const result = await auth.createUserWithEmailAndPassword(email, password);
+        const user = result.user;
+
+        // Update display name
+        if (displayName) {
+            await user.updateProfile({ displayName });
+        }
+
+        // Send verification email
+        await user.sendEmailVerification({
+            url: window.location.origin + '/index.html',
+            handleCodeInApp: false
+        });
+
+        return user;
+    },
+
+    // Sign in with email and password
+    async signInWithEmail(email, password) {
+        if (!auth) {
+            throw new Error('Firebase not initialized');
+        }
+
+        const result = await auth.signInWithEmailAndPassword(email, password);
+        const user = result.user;
+
+        // Check if email is verified
+        if (!user.emailVerified) {
+            throw new Error('Please verify your email before signing in.');
+        }
+
+        return user;
+    },
+
+    // Send password reset email
+    async sendPasswordResetEmail(email) {
+        if (!auth) {
+            throw new Error('Firebase not initialized');
+        }
+        return auth.sendPasswordResetEmail(email);
+    },
+
+    // Resend verification email
+    async resendVerificationEmail() {
+        const user = this.getCurrentUser();
+        if (!user) {
+            throw new Error('No user signed in');
+        }
+        return user.sendEmailVerification();
+    },
+
     // Sign out
     async signOut() {
         if (!auth) {

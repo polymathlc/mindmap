@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MindMap Pro - Visual Thinking Made Simple</title>
+    <link rel="stylesheet" href="css/landing.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-logo">
+                <span class="logo-icon">&#9670;</span>
+                <span class="logo-text">MindMap Pro</span>
+            </div>
+            <div class="nav-links">
+                <a href="#features">Features</a>
+                <a href="#pricing">Pricing</a>
+                <a href="#testimonials">Testimonials</a>
+            </div>
+            <div class="nav-auth">
+                <button class="btn btn-ghost" id="loginBtn">Log In</button>
+                <button class="btn btn-primary" id="signupBtn">Sign Up Free</button>
+            </div>
+            <button class="mobile-menu-btn" id="mobileMenuBtn">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Mobile Menu -->
+    <div class="mobile-menu" id="mobileMenu">
+        <a href="#features">Features</a>
+        <a href="#pricing">Pricing</a>
+        <a href="#testimonials">Testimonials</a>
+        <button class="btn btn-ghost" id="loginBtnMobile">Log In</button>
+        <button class="btn btn-primary" id="signupBtnMobile">Sign Up Free</button>
+    </div>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="hero-content">
+            <div class="hero-badge">New: AI-Powered Suggestions Coming Soon</div>
+            <h1>Transform Your Ideas Into<br><span class="gradient-text">Visual Masterpieces</span></h1>
+            <p class="hero-subtitle">
+                Create stunning mind maps, flowcharts, and diagrams in seconds.
+                Boost your productivity with intuitive keyboard shortcuts and seamless collaboration.
+            </p>
+            <div class="hero-cta">
+                <button class="btn btn-primary btn-large" id="heroSignupBtn">
+                    Start Creating Free
+                    <span class="arrow">&#8594;</span>
+                </button>
+                <button class="btn btn-ghost btn-large" onclick="document.getElementById('demo').scrollIntoView({behavior: 'smooth'})">
+                    Watch Demo
+                    <span class="play-icon">&#9654;</span>
+                </button>
+            </div>
+            <div class="hero-stats">
+                <div class="stat">
+                    <span class="stat-number">10,000+</span>
+                    <span class="stat-label">Active Users</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-number">50,000+</span>
+                    <span class="stat-label">Maps Created</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-number">4.9/5</span>
+                    <span class="stat-label">User Rating</span>
+                </div>
+            </div>
+        </div>
+        <div class="hero-image">
+            <div class="app-preview">
+                <div class="preview-toolbar">
+                    <div class="preview-dots">
+                        <span></span><span></span><span></span>
+                    </div>
+                    <span class="preview-title">MindMap Pro</span>
+                </div>
+                <div class="preview-canvas">
+                    <div class="preview-node central">Main Idea</div>
+                    <div class="preview-node child1">Feature 1</div>
+                    <div class="preview-node child2">Feature 2</div>
+                    <div class="preview-node child3">Feature 3</div>
+                    <svg class="preview-connections" viewBox="0 0 400 300">
+                        <path d="M200,100 L100,180" stroke="#6c5ce7" stroke-width="2" fill="none"/>
+                        <path d="M200,100 L200,200" stroke="#6c5ce7" stroke-width="2" fill="none"/>
+                        <path d="M200,100 L300,180" stroke="#6c5ce7" stroke-width="2" fill="none"/>
+                    </svg>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="features" id="features">
+        <div class="section-container">
+            <div class="section-header">
+                <h2>Everything You Need to<br><span class="gradient-text">Think Visually</span></h2>
+                <p>Powerful features designed for speed and simplicity</p>
+            </div>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">&#9881;</div>
+                    <h3>Keyboard-First Design</h3>
+                    <p>Create nodes with Tab, siblings with Enter, and connect shapes with a single keystroke. Your hands never leave the keyboard.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">&#9729;</div>
+                    <h3>Cloud Sync</h3>
+                    <p>Access your mind maps from anywhere. Your work is automatically saved and synced across all your devices.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">&#9733;</div>
+                    <h3>Beautiful Templates</h3>
+                    <p>Start with professionally designed templates or create your own. Pastel colors and clean aesthetics included.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">&#128640;</div>
+                    <h3>Lightning Fast</h3>
+                    <p>No lag, no loading screens. Click to place shapes, type to edit, and export instantly as PNG.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">&#128279;</div>
+                    <h3>Smart Connections</h3>
+                    <p>Orthogonal arrows automatically route around shapes. Create professional diagrams without manual alignment.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">&#128736;</div>
+                    <h3>Multiple Shape Types</h3>
+                    <p>Rectangles, circles, diamonds, triangles and more. Each shape is just one keystroke away.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Demo Section -->
+    <section class="demo" id="demo">
+        <div class="section-container">
+            <div class="section-header">
+                <h2>See It In Action</h2>
+                <p>Watch how easy it is to create a mind map in under 60 seconds</p>
+            </div>
+            <div class="demo-video">
+                <div class="video-placeholder">
+                    <div class="play-button">&#9654;</div>
+                    <p>Interactive Demo</p>
+                </div>
+            </div>
+            <div class="shortcut-showcase">
+                <h3>Master These Shortcuts</h3>
+                <div class="shortcuts-grid">
+                    <div class="shortcut">
+                        <kbd>R</kbd>
+                        <span>Rectangle</span>
+                    </div>
+                    <div class="shortcut">
+                        <kbd>Tab</kbd>
+                        <span>Add Child</span>
+                    </div>
+                    <div class="shortcut">
+                        <kbd>Enter</kbd>
+                        <span>Add Sibling</span>
+                    </div>
+                    <div class="shortcut">
+                        <kbd>A</kbd>
+                        <span>Connect</span>
+                    </div>
+                    <div class="shortcut">
+                        <kbd>Type</kbd>
+                        <span>Edit Text</span>
+                    </div>
+                    <div class="shortcut">
+                        <kbd>Ctrl+S</kbd>
+                        <span>Save</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Pricing Section -->
+    <section class="pricing" id="pricing">
+        <div class="section-container">
+            <div class="section-header">
+                <h2>Simple, Transparent Pricing</h2>
+                <p>Start free, upgrade when you're ready</p>
+            </div>
+            <div class="pricing-grid">
+                <div class="pricing-card">
+                    <div class="pricing-header">
+                        <h3>Free</h3>
+                        <div class="price">
+                            <span class="amount">$0</span>
+                            <span class="period">/month</span>
+                        </div>
+                    </div>
+                    <ul class="pricing-features">
+                        <li>&#10003; Up to 5 mind maps</li>
+                        <li>&#10003; All shape types</li>
+                        <li>&#10003; PNG export</li>
+                        <li>&#10003; Cloud sync</li>
+                        <li class="disabled">&#10005; Unlimited maps</li>
+                        <li class="disabled">&#10005; Team collaboration</li>
+                    </ul>
+                    <button class="btn btn-ghost btn-full" id="freeSignupBtn">Get Started</button>
+                </div>
+                <div class="pricing-card featured">
+                    <div class="featured-badge">Most Popular</div>
+                    <div class="pricing-header">
+                        <h3>Pro</h3>
+                        <div class="price">
+                            <span class="amount">$9</span>
+                            <span class="period">/month</span>
+                        </div>
+                    </div>
+                    <ul class="pricing-features">
+                        <li>&#10003; Unlimited mind maps</li>
+                        <li>&#10003; All shape types</li>
+                        <li>&#10003; PNG, SVG, PDF export</li>
+                        <li>&#10003; Cloud sync</li>
+                        <li>&#10003; Priority support</li>
+                        <li>&#10003; Custom templates</li>
+                    </ul>
+                    <button class="btn btn-primary btn-full" id="proSignupBtn">Start Free Trial</button>
+                </div>
+                <div class="pricing-card">
+                    <div class="pricing-header">
+                        <h3>Team</h3>
+                        <div class="price">
+                            <span class="amount">$29</span>
+                            <span class="period">/month</span>
+                        </div>
+                    </div>
+                    <ul class="pricing-features">
+                        <li>&#10003; Everything in Pro</li>
+                        <li>&#10003; Up to 10 team members</li>
+                        <li>&#10003; Real-time collaboration</li>
+                        <li>&#10003; Admin dashboard</li>
+                        <li>&#10003; SSO integration</li>
+                        <li>&#10003; Dedicated support</li>
+                    </ul>
+                    <button class="btn btn-ghost btn-full">Contact Sales</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Testimonials Section -->
+    <section class="testimonials" id="testimonials">
+        <div class="section-container">
+            <div class="section-header">
+                <h2>Loved by Thinkers Everywhere</h2>
+                <p>See what our users are saying</p>
+            </div>
+            <div class="testimonials-grid">
+                <div class="testimonial-card">
+                    <div class="testimonial-content">
+                        <p>"The keyboard shortcuts changed everything. I can now brainstorm ideas twice as fast as before."</p>
+                    </div>
+                    <div class="testimonial-author">
+                        <div class="author-avatar">SJ</div>
+                        <div class="author-info">
+                            <strong>Sarah Johnson</strong>
+                            <span>Product Manager at TechCorp</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="testimonial-card">
+                    <div class="testimonial-content">
+                        <p>"Finally, a mind mapping tool that doesn't get in my way. Clean, fast, and intuitive."</p>
+                    </div>
+                    <div class="testimonial-author">
+                        <div class="author-avatar">MK</div>
+                        <div class="author-info">
+                            <strong>Michael Kim</strong>
+                            <span>Software Engineer</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="testimonial-card">
+                    <div class="testimonial-content">
+                        <p>"I use it daily for planning lessons. The Tab and Enter shortcuts for creating hierarchies are genius."</p>
+                    </div>
+                    <div class="testimonial-author">
+                        <div class="author-avatar">EL</div>
+                        <div class="author-info">
+                            <strong>Emily Lee</strong>
+                            <span>Teacher</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="cta">
+        <div class="section-container">
+            <h2>Ready to Transform Your Thinking?</h2>
+            <p>Join thousands of users who've upgraded their visual thinking.</p>
+            <button class="btn btn-primary btn-large" id="ctaSignupBtn">
+                Start Creating Free
+                <span class="arrow">&#8594;</span>
+            </button>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-container">
+            <div class="footer-brand">
+                <div class="nav-logo">
+                    <span class="logo-icon">&#9670;</span>
+                    <span class="logo-text">MindMap Pro</span>
+                </div>
+                <p>Visual thinking made simple.</p>
+            </div>
+            <div class="footer-links">
+                <div class="footer-column">
+                    <h4>Product</h4>
+                    <a href="#features">Features</a>
+                    <a href="#pricing">Pricing</a>
+                    <a href="#">Changelog</a>
+                </div>
+                <div class="footer-column">
+                    <h4>Resources</h4>
+                    <a href="#">Documentation</a>
+                    <a href="#">Tutorials</a>
+                    <a href="#">Blog</a>
+                </div>
+                <div class="footer-column">
+                    <h4>Company</h4>
+                    <a href="#">About</a>
+                    <a href="#">Contact</a>
+                    <a href="#">Privacy Policy</a>
+                </div>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p>&copy; 2026 MindMap Pro. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <!-- Auth Modal -->
+    <div class="modal" id="authModal">
+        <div class="modal-content auth-modal">
+            <button class="modal-close" id="closeAuthModal">&times;</button>
+
+            <!-- Login Form -->
+            <div class="auth-form" id="loginForm">
+                <h2>Welcome Back</h2>
+                <p class="auth-subtitle">Sign in to continue to MindMap Pro</p>
+
+                <button class="btn btn-google" id="googleSignInBtn">
+                    <svg viewBox="0 0 24 24" width="20" height="20">
+                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                    </svg>
+                    Continue with Google
+                </button>
+
+                <div class="divider">
+                    <span>or sign in with email</span>
+                </div>
+
+                <form id="emailLoginForm">
+                    <div class="form-group">
+                        <label for="loginEmail">Email</label>
+                        <input type="email" id="loginEmail" placeholder="you@example.com" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="loginPassword">Password</label>
+                        <input type="password" id="loginPassword" placeholder="Enter your password" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-full">Sign In</button>
+                </form>
+
+                <div class="auth-footer">
+                    <a href="#" id="forgotPasswordLink">Forgot password?</a>
+                    <p>Don't have an account? <a href="#" id="showSignupLink">Sign up</a></p>
+                </div>
+            </div>
+
+            <!-- Signup Form -->
+            <div class="auth-form" id="signupForm" style="display: none;">
+                <h2>Create Account</h2>
+                <p class="auth-subtitle">Start your visual thinking journey</p>
+
+                <button class="btn btn-google" id="googleSignUpBtn">
+                    <svg viewBox="0 0 24 24" width="20" height="20">
+                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                    </svg>
+                    Continue with Google
+                </button>
+
+                <div class="divider">
+                    <span>or sign up with email</span>
+                </div>
+
+                <form id="emailSignupForm">
+                    <div class="form-group">
+                        <label for="signupName">Full Name</label>
+                        <input type="text" id="signupName" placeholder="John Doe" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="signupEmail">Email</label>
+                        <input type="email" id="signupEmail" placeholder="you@example.com" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="signupPassword">Password</label>
+                        <input type="password" id="signupPassword" placeholder="Create a password (min 6 chars)" required minlength="6">
+                    </div>
+                    <div class="form-group">
+                        <label for="signupConfirmPassword">Confirm Password</label>
+                        <input type="password" id="signupConfirmPassword" placeholder="Confirm your password" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-full">Create Account</button>
+                </form>
+
+                <div class="auth-footer">
+                    <p>Already have an account? <a href="#" id="showLoginLink">Sign in</a></p>
+                </div>
+            </div>
+
+            <!-- Forgot Password Form -->
+            <div class="auth-form" id="forgotPasswordForm" style="display: none;">
+                <h2>Reset Password</h2>
+                <p class="auth-subtitle">Enter your email to receive a reset link</p>
+
+                <form id="emailResetForm">
+                    <div class="form-group">
+                        <label for="resetEmail">Email</label>
+                        <input type="email" id="resetEmail" placeholder="you@example.com" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-full">Send Reset Link</button>
+                </form>
+
+                <div class="auth-footer">
+                    <p><a href="#" id="backToLoginLink">Back to sign in</a></p>
+                </div>
+            </div>
+
+            <!-- Email Verification Notice -->
+            <div class="auth-form" id="verificationNotice" style="display: none;">
+                <div class="verification-icon">&#9993;</div>
+                <h2>Check Your Email</h2>
+                <p class="auth-subtitle">We've sent a verification link to <strong id="verificationEmail"></strong></p>
+                <p class="verification-text">Click the link in the email to verify your account and start using MindMap Pro.</p>
+                <button class="btn btn-ghost btn-full" id="resendVerificationBtn">Resend Verification Email</button>
+                <div class="auth-footer">
+                    <p><a href="#" id="backToLoginFromVerification">Back to sign in</a></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div class="toast" id="toast">
+        <span class="toast-message" id="toastMessage"></span>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+
+    <!-- Auth Script -->
+    <script src="js/auth.js"></script>
+</body>
+</html>
