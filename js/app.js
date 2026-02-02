@@ -21,6 +21,10 @@ class MindmapApp {
         this.resizeHandle = null;
         this.connectionStart = null;
 
+        // Arrow connection mode (press A, click origin, click target)
+        this.isArrowConnectionMode = false;
+        this.arrowConnectionOrigin = null;
+
         // Pan and Zoom
         this.panOffset = { x: 0, y: 0 };
         this.zoom = 1;
@@ -136,6 +140,12 @@ class MindmapApp {
         }
 
         if (e.button !== 0) return;
+
+        // Handle arrow connection mode clicks
+        if (this.isArrowConnectionMode) {
+            this.handleArrowConnectionClick(pos);
+            return;
+        }
 
         if (this.currentTool === 'select') {
             this.handleSelectMouseDown(pos, e);
@@ -593,6 +603,31 @@ class MindmapApp {
 
         const key = e.key.toLowerCase();
 
+        // Handle Tab and Enter for creating connected shapes
+        if (e.key === 'Tab' && this.selectedElements.length === 1) {
+            e.preventDefault();
+            this.createChildShape();
+            return;
+        }
+
+        if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey && this.selectedElements.length === 1) {
+            e.preventDefault();
+            this.createSiblingShape();
+            return;
+        }
+
+        // Handle Escape - cancel arrow connection mode or deselect
+        if (e.key === 'Escape') {
+            if (this.isArrowConnectionMode) {
+                this.cancelArrowConnectionMode();
+            } else {
+                this.selectedElements = [];
+            }
+            this.render();
+            this.updatePropertyPanel();
+            return;
+        }
+
         // Tool shortcuts
         if (!e.ctrlKey && !e.metaKey) {
             switch (key) {
@@ -612,7 +647,8 @@ class MindmapApp {
                     this.setTool('triangle');
                     return;
                 case 'a':
-                    this.setTool('arrow');
+                    // Enter arrow connection mode
+                    this.startArrowConnectionMode();
                     return;
                 case 'l':
                     this.setTool('line');
@@ -624,11 +660,17 @@ class MindmapApp {
                 case 'backspace':
                     this.deleteSelected();
                     return;
-                case 'escape':
-                    this.selectedElements = [];
-                    this.render();
-                    this.updatePropertyPanel();
+            }
+
+            // Direct text typing on selected shape - if a printable character is pressed
+            if (this.selectedElements.length === 1 && e.key.length === 1 && !e.ctrlKey && !e.metaKey) {
+                const element = this.selectedElements[0];
+                if (element.type !== 'arrow' && element.type !== 'line') {
+                    // Start editing with the typed character
+                    this.editElementTextWithInitialChar(element, e.key);
+                    e.preventDefault();
                     return;
+                }
             }
         }
 
@@ -1663,6 +1705,210 @@ class MindmapApp {
                 finishEdit();
             }
         });
+    }
+
+    // Text Editing with initial character (for direct typing on selected shape)
+    editElementTextWithInitialChar(element, initialChar) {
+        const bounds = this.getElementBounds(element);
+
+        // Create text input overlay
+        let overlay = document.getElementById('textInputOverlay');
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.id = 'textInputOverlay';
+            document.getElementById('canvasContainer').appendChild(overlay);
+        }
+
+        const textarea = document.createElement('textarea');
+        // Replace existing text with the initial character
+        textarea.value = initialChar;
+        textarea.style.width = Math.max(bounds.width, 100) + 'px';
+        textarea.style.height = Math.max(bounds.height, 40) + 'px';
+        textarea.style.fontSize = (element.fontSize || 14) + 'px';
+        textarea.style.textAlign = 'center';
+
+        overlay.innerHTML = '';
+        overlay.appendChild(textarea);
+        overlay.style.display = 'block';
+        overlay.style.left = (bounds.x * this.zoom + this.panOffset.x) + 'px';
+        overlay.style.top = (bounds.y * this.zoom + this.panOffset.y) + 'px';
+
+        textarea.focus();
+        // Move cursor to end
+        textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+
+        const finishEdit = () => {
+            element.text = textarea.value;
+            overlay.style.display = 'none';
+            this.saveState();
+            this.render();
+        };
+
+        textarea.addEventListener('blur', finishEdit);
+        textarea.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                overlay.style.display = 'none';
+                this.render();
+            } else if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                finishEdit();
+            }
+        });
+    }
+
+    // Arrow Connection Mode (press A, click origin, click target)
+    startArrowConnectionMode() {
+        this.isArrowConnectionMode = true;
+        this.arrowConnectionOrigin = null;
+        this.setTool('select');
+        this.canvas.style.cursor = 'crosshair';
+        this.showArrowModeIndicator('Click origin shape');
+    }
+
+    cancelArrowConnectionMode() {
+        this.isArrowConnectionMode = false;
+        this.arrowConnectionOrigin = null;
+        this.canvas.style.cursor = 'default';
+        this.hideArrowModeIndicator();
+    }
+
+    showArrowModeIndicator(message) {
+        let indicator = document.getElementById('arrowModeIndicator');
+        if (!indicator) {
+            indicator = document.createElement('div');
+            indicator.id = 'arrowModeIndicator';
+            indicator.style.cssText = `
+                position: fixed;
+                top: 80px;
+                left: 50%;
+                transform: translateX(-50%);
+                background: #6c5ce7;
+                color: white;
+                padding: 8px 16px;
+                border-radius: 4px;
+                font-size: 14px;
+                z-index: 1000;
+                pointer-events: none;
+            `;
+            document.body.appendChild(indicator);
+        }
+        indicator.textContent = message;
+        indicator.style.display = 'block';
+    }
+
+    hideArrowModeIndicator() {
+        const indicator = document.getElementById('arrowModeIndicator');
+        if (indicator) {
+            indicator.style.display = 'none';
+        }
+    }
+
+    handleArrowConnectionClick(pos) {
+        const clickedElement = this.getElementAtPosition(pos);
+
+        if (!clickedElement || clickedElement.type === 'arrow' || clickedElement.type === 'line') {
+            // Clicked on empty space or non-shape - cancel mode
+            this.cancelArrowConnectionMode();
+            return false;
+        }
+
+        if (!this.arrowConnectionOrigin) {
+            // First click - set origin
+            this.arrowConnectionOrigin = clickedElement;
+            this.selectedElements = [clickedElement];
+            this.showArrowModeIndicator('Click target shape');
+            this.render();
+            return true;
+        } else {
+            // Second click - set target and create connection
+            if (clickedElement !== this.arrowConnectionOrigin) {
+                this.createConnection(this.arrowConnectionOrigin, clickedElement);
+                this.selectedElements = [clickedElement];
+            }
+            this.cancelArrowConnectionMode();
+            this.render();
+            return true;
+        }
+    }
+
+    // Create child shape (Tab key) - creates shape to the right with connection
+    createChildShape() {
+        if (this.selectedElements.length !== 1) return;
+
+        const parent = this.selectedElements[0];
+        if (parent.type === 'arrow' || parent.type === 'line') return;
+
+        const parentBounds = this.getElementBounds(parent);
+        const fillColor = this.getRandomPastelColor();
+        const strokeColor = this.getStrokeForFill(fillColor);
+
+        // Position child to the right of parent
+        const spacing = 50;
+        const newX = parentBounds.x + parentBounds.width + spacing;
+        const newY = parentBounds.y;
+
+        const child = this.createElement(
+            parent.type,
+            newX,
+            newY,
+            newX + this.defaultWidth,
+            newY + this.defaultHeight
+        );
+        child.fillColor = fillColor;
+        child.strokeColor = strokeColor;
+
+        this.elements.push(child);
+        this.createConnection(parent, child);
+        this.selectedElements = [child];
+        this.saveState();
+        this.render();
+        this.updatePropertyPanel();
+
+        // Start editing the new shape
+        this.editElementText(child);
+    }
+
+    // Create sibling shape (Enter key) - creates shape below at same level
+    createSiblingShape() {
+        if (this.selectedElements.length !== 1) return;
+
+        const current = this.selectedElements[0];
+        if (current.type === 'arrow' || current.type === 'line') return;
+
+        const currentBounds = this.getElementBounds(current);
+        const fillColor = this.getRandomPastelColor();
+        const strokeColor = this.getStrokeForFill(fillColor);
+
+        // Position sibling below current
+        const spacing = 30;
+        const newX = currentBounds.x;
+        const newY = currentBounds.y + currentBounds.height + spacing;
+
+        const sibling = this.createElement(
+            current.type,
+            newX,
+            newY,
+            newX + currentBounds.width,
+            newY + currentBounds.height
+        );
+        sibling.fillColor = fillColor;
+        sibling.strokeColor = strokeColor;
+
+        this.elements.push(sibling);
+
+        // Find parent connection and connect sibling to same parent
+        const parentConnection = this.connections.find(c => c.to === current);
+        if (parentConnection) {
+            this.createConnection(parentConnection.from, sibling);
+        }
+
+        this.selectedElements = [sibling];
+        this.saveState();
+        this.render();
+        this.updatePropertyPanel();
+
+        // Start editing the new shape
+        this.editElementText(sibling);
     }
 
     // Toolbar Setup
