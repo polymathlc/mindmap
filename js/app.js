@@ -1010,6 +1010,107 @@ class MindmapApp {
         this.ctx.stroke();
     }
 
+    // Wrap text to fit within a given width
+    wrapText(text, maxWidth, fontSize, ctx) {
+        if (!text) return [];
+
+        const font = `${fontSize}px -apple-system, BlinkMacSystemFont, sans-serif`;
+        ctx.font = font;
+
+        const paragraphs = text.split('\n');
+        const lines = [];
+
+        paragraphs.forEach(paragraph => {
+            if (paragraph === '') {
+                lines.push('');
+                return;
+            }
+
+            const words = paragraph.split(' ');
+            let currentLine = '';
+
+            words.forEach(word => {
+                const testLine = currentLine ? currentLine + ' ' + word : word;
+                const metrics = ctx.measureText(testLine);
+
+                if (metrics.width > maxWidth && currentLine) {
+                    lines.push(currentLine);
+                    currentLine = word;
+                } else {
+                    currentLine = testLine;
+                }
+            });
+
+            if (currentLine) {
+                lines.push(currentLine);
+            }
+        });
+
+        return lines;
+    }
+
+    // Calculate optimal font size to fit text within shape bounds
+    // Strategy: first wrap text, then reduce font size if needed to fit height
+    calculateOptimalFontSize(text, maxWidth, maxHeight, baseFontSize, ctx, padding = 10) {
+        if (!text) return { fontSize: baseFontSize, lines: [] };
+
+        const minFontSize = 8;
+        const lineHeightRatio = 1.3;
+        let fontSize = baseFontSize;
+
+        // Available space after padding
+        const availableWidth = maxWidth - padding * 2;
+        const availableHeight = maxHeight - padding * 2;
+
+        while (fontSize >= minFontSize) {
+            const lines = this.wrapText(text, availableWidth, fontSize, ctx);
+            const totalTextHeight = lines.length * fontSize * lineHeightRatio;
+
+            if (totalTextHeight <= availableHeight) {
+                return { fontSize, lines };
+            }
+
+            fontSize -= 1;
+        }
+
+        // Return minimum font size even if it doesn't fit perfectly
+        const lines = this.wrapText(text, availableWidth, minFontSize, ctx);
+        return { fontSize: minFontSize, lines };
+    }
+
+    // Render text with crisp quality at any zoom level
+    // This renders text outside the zoom transform for pixel-perfect clarity
+    renderCrispText(lines, centerX, centerY, fontSize, maxHeight, padding = 10) {
+        if (lines.length === 0) return;
+
+        // Calculate screen-space coordinates
+        const screenX = centerX * this.zoom + this.panOffset.x;
+        const screenY = centerY * this.zoom + this.panOffset.y;
+        const screenFontSize = fontSize * this.zoom;
+        const lineHeight = fontSize * 1.3 * this.zoom;
+
+        // Save current state and reset transform for crisp text rendering
+        this.ctx.save();
+        this.ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset to identity matrix
+
+        // Set text properties with scaled font size
+        this.ctx.fillStyle = '#333333';
+        this.ctx.font = `${screenFontSize}px -apple-system, BlinkMacSystemFont, sans-serif`;
+        this.ctx.textAlign = 'center';
+        this.ctx.textBaseline = 'middle';
+
+        // Calculate starting Y position to center text block vertically
+        const totalTextHeight = lines.length * lineHeight;
+        const startY = screenY - totalTextHeight / 2 + lineHeight / 2;
+
+        // Draw each line
+        lines.forEach((line, i) => {
+            this.ctx.fillText(line, screenX, startY + i * lineHeight);
+        });
+
+        this.ctx.restore();
+    }
+
     drawText(element) {
         const { x, y, width, height, text, fontSize } = element;
 
@@ -1020,20 +1121,20 @@ class MindmapApp {
             this.ctx.strokeRect(x, y, width, height);
         }
 
-        // Draw text - always centered
-        this.ctx.fillStyle = '#333333';
-        this.ctx.font = `${fontSize || 14}px -apple-system, BlinkMacSystemFont, sans-serif`;
-        this.ctx.textAlign = 'center';
-        this.ctx.textBaseline = 'middle';
-
+        // Draw text with crisp rendering, auto-wrapping, and auto-sizing
         if (text) {
-            const lines = text.split('\n');
-            const lineHeight = (fontSize || 14) * 1.3;
-            const startY = y + height / 2 - (lines.length - 1) * lineHeight / 2;
+            const baseFontSize = fontSize || 14;
+            const padding = 8;
 
-            lines.forEach((line, i) => {
-                this.ctx.fillText(line, x + width / 2, startY + i * lineHeight);
-            });
+            // Calculate optimal font size with text wrapping
+            const { fontSize: optimalFontSize, lines } = this.calculateOptimalFontSize(
+                text, width, height, baseFontSize, this.ctx, padding
+            );
+
+            // Render crisp text at center of element
+            const centerX = x + width / 2;
+            const centerY = y + height / 2;
+            this.renderCrispText(lines, centerX, centerY, optimalFontSize, height, padding);
         }
     }
 
@@ -1052,22 +1153,31 @@ class MindmapApp {
     drawElementText(element) {
         if (!element.text) return;
 
-        // Dark text for contrast on pastel backgrounds
-        this.ctx.fillStyle = '#333333';
-        this.ctx.font = `${element.fontSize || 14}px -apple-system, BlinkMacSystemFont, sans-serif`;
-        this.ctx.textAlign = 'center';
-        this.ctx.textBaseline = 'middle';
+        const width = element.width || 0;
+        const height = element.height || 0;
+        const baseFontSize = element.fontSize || 14;
 
-        const cx = element.x + (element.width || 0) / 2;
-        const cy = element.y + (element.height || 0) / 2;
+        // Calculate padding based on shape type
+        // Diamonds and triangles need more padding due to their shape
+        let padding = 10;
+        if (element.type === 'diamond') {
+            padding = Math.min(width, height) * 0.25;
+        } else if (element.type === 'triangle') {
+            padding = Math.min(width, height) * 0.2;
+        } else if (element.type === 'circle') {
+            // For circles/ellipses, use more padding on sides
+            padding = Math.min(width, height) * 0.15;
+        }
 
-        const lines = element.text.split('\n');
-        const lineHeight = (element.fontSize || 14) * 1.3;
-        const startY = cy - (lines.length - 1) * lineHeight / 2;
+        // Calculate optimal font size with text wrapping
+        const { fontSize: optimalFontSize, lines } = this.calculateOptimalFontSize(
+            element.text, width, height, baseFontSize, this.ctx, padding
+        );
 
-        lines.forEach((line, i) => {
-            this.ctx.fillText(line, cx, startY + i * lineHeight);
-        });
+        // Render crisp text at center of element
+        const centerX = element.x + width / 2;
+        const centerY = element.y + height / 2;
+        this.renderCrispText(lines, centerX, centerY, optimalFontSize, height, padding);
     }
 
     drawSelectionIndicator(element) {
