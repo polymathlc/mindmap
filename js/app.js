@@ -253,16 +253,29 @@ class MindmapApp {
         const fillColor = this.getRandomPastelColor();
         const strokeColor = this.getStrokeForFill(fillColor);
 
+        // Text boxes are smaller and transparent by default
+        const isTextBox = this.currentTool === 'text';
+        const width = isTextBox ? 150 : this.defaultWidth;
+        const height = isTextBox ? 40 : this.defaultHeight;
+
         const element = this.createElement(
             this.currentTool,
-            pos.x - this.defaultWidth / 2,
-            pos.y - this.defaultHeight / 2,
-            pos.x + this.defaultWidth / 2,
-            pos.y + this.defaultHeight / 2
+            pos.x - width / 2,
+            pos.y - height / 2,
+            pos.x + width / 2,
+            pos.y + height / 2
         );
 
-        element.fillColor = fillColor;
-        element.strokeColor = strokeColor;
+        if (isTextBox) {
+            // Text boxes are transparent with no border by default
+            element.fillColor = 'transparent';
+            element.strokeColor = 'transparent';
+            element.strokeWidth = 0;
+            element.fontSize = 16;
+        } else {
+            element.fillColor = fillColor;
+            element.strokeColor = strokeColor;
+        }
 
         this.elements.push(element);
         this.selectedElements = [element];
@@ -272,6 +285,11 @@ class MindmapApp {
 
         // Switch back to select tool after placing
         this.setTool('select');
+        
+        // Immediately start editing text for text boxes
+        if (isTextBox) {
+            this.editElementText(element);
+        }
     }
 
     handleMouseMove(e) {
@@ -398,11 +416,12 @@ class MindmapApp {
         if (element && element.type !== 'arrow' && element.type !== 'line') {
             this.editElementText(element);
         } else if (this.currentTool === 'select') {
-            // Create text element on double click
-            const fillColor = this.getRandomPastelColor();
-            const textElement = this.createElement('text', pos.x - 50, pos.y - 20, pos.x + 50, pos.y + 20);
-            textElement.fillColor = fillColor;
-            textElement.strokeColor = this.getStrokeForFill(fillColor);
+            // Create transparent text element on double click
+            const textElement = this.createElement('text', pos.x - 75, pos.y - 20, pos.x + 75, pos.y + 20);
+            textElement.fillColor = 'transparent';
+            textElement.strokeColor = 'transparent';
+            textElement.strokeWidth = 0;
+            textElement.fontSize = 16;
             this.elements.push(textElement);
             this.selectedElements = [textElement];
             this.saveState();
@@ -1235,17 +1254,23 @@ class MindmapApp {
     drawText(element) {
         const { x, y, width, height, text, fontSize } = element;
 
-        // Draw background if has fill color
+        // Draw background if has fill color (not transparent)
         if (element.fillColor && element.fillColor !== 'transparent') {
             this.ctx.fillStyle = element.fillColor;
             this.ctx.fillRect(x, y, width, height);
+        }
+        
+        // Draw border if has stroke color (not transparent)
+        if (element.strokeColor && element.strokeColor !== 'transparent' && element.strokeWidth > 0) {
+            this.ctx.strokeStyle = element.strokeColor;
+            this.ctx.lineWidth = element.strokeWidth || 1;
             this.ctx.strokeRect(x, y, width, height);
         }
 
         // Draw text with crisp rendering, auto-wrapping, and auto-sizing
         if (text) {
-            const baseFontSize = fontSize || 14;
-            const padding = 8;
+            const baseFontSize = fontSize || 16;
+            const padding = 4;
 
             // Calculate optimal font size with text wrapping
             const { fontSize: optimalFontSize, lines } = this.calculateOptimalFontSize(
