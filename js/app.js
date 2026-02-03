@@ -2464,11 +2464,14 @@ class MindmapApp {
             return;
         }
 
+        document.getElementById('saveModal').style.display = 'none';
+        this.showLoading('Saving...');
+
         try {
-            // Process elements - upload images to Storage and keep base64 as backup
+            // Process elements - upload images to Storage (NO base64 in Firestore to avoid 1MB limit)
             const processedElements = await Promise.all(this.elements.map(async (el, index) => {
                 const processed = { ...el, image: undefined };
-                
+
                 // Handle embedded images
                 if (el.embeddedImage && el.embeddedImage.data) {
                     try {
@@ -2483,24 +2486,31 @@ class MindmapApp {
                             originalWidth: el.embeddedImage.originalWidth,
                             originalHeight: el.embeddedImage.originalHeight,
                             url: imageUrl,
-                            data: el.embeddedImage.data, // Keep base64 as backup
+                            // NO base64 data stored - only URL to avoid Firestore 1MB limit
                             image: undefined
                         };
                     } catch (uploadErr) {
                         console.warn('Failed to upload embedded image:', uploadErr);
-                        // Keep base64 data only
+                        // Store minimal data without base64
                         processed.embeddedImage = {
-                            ...el.embeddedImage,
+                            position: el.embeddedImage.position,
+                            scale: el.embeddedImage.scale,
+                            originalWidth: el.embeddedImage.originalWidth,
+                            originalHeight: el.embeddedImage.originalHeight,
                             image: undefined
                         };
                     }
                 } else if (el.embeddedImage) {
                     processed.embeddedImage = {
-                        ...el.embeddedImage,
+                        position: el.embeddedImage.position,
+                        scale: el.embeddedImage.scale,
+                        originalWidth: el.embeddedImage.originalWidth,
+                        originalHeight: el.embeddedImage.originalHeight,
+                        url: el.embeddedImage.url,
                         image: undefined
                     };
                 }
-                
+
                 // Handle standalone images
                 if (el.type === 'image' && el.imageData) {
                     try {
@@ -2510,13 +2520,20 @@ class MindmapApp {
                             filename
                         );
                         processed.imageUrl = imageUrl;
-                        // Keep imageData as backup
+                        // Remove base64 data to avoid Firestore 1MB limit
+                        processed.imageData = undefined;
                     } catch (uploadErr) {
                         console.warn('Failed to upload image:', uploadErr);
+                        // Remove base64 to avoid size limit - image won't load on reload
+                        processed.imageData = undefined;
                     }
                     processed.image = undefined;
+                } else if (el.type === 'image') {
+                    // Already has URL, just clean up
+                    processed.imageData = undefined;
+                    processed.image = undefined;
                 }
-                
+
                 return processed;
             }));
 
@@ -2529,9 +2546,6 @@ class MindmapApp {
                     strokeWidth: c.strokeWidth
                 }))
             };
-
-            document.getElementById('saveModal').style.display = 'none';
-            this.showLoading('Saving...');
 
             // Generate and upload thumbnail
             let thumbnailUrl = null;
