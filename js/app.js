@@ -2410,11 +2410,56 @@ class MindmapApp {
         }
 
         try {
+            // Process elements - upload embedded images to Storage
+            const processedElements = await Promise.all(this.elements.map(async (el, index) => {
+                const processed = { ...el, image: undefined };
+                
+                // Upload embedded images to Firebase Storage
+                if (el.embeddedImage && el.embeddedImage.data) {
+                    try {
+                        const filename = `embedded_${index}_${Date.now()}.png`;
+                        const imageUrl = await FirebaseService.uploadImage(
+                            this.dataURLtoBlob(el.embeddedImage.data),
+                            filename
+                        );
+                        processed.embeddedImage = {
+                            ...el.embeddedImage,
+                            url: imageUrl,
+                            data: undefined, // Don't save base64
+                            image: undefined
+                        };
+                    } catch (uploadErr) {
+                        console.warn('Failed to upload embedded image:', uploadErr);
+                        // Keep minimal data without base64
+                        processed.embeddedImage = {
+                            position: el.embeddedImage.position,
+                            scale: el.embeddedImage.scale,
+                            originalWidth: el.embeddedImage.originalWidth,
+                            originalHeight: el.embeddedImage.originalHeight
+                        };
+                    }
+                }
+                
+                // Handle standalone images
+                if (el.type === 'image' && el.imageData) {
+                    try {
+                        const filename = `image_${index}_${Date.now()}.png`;
+                        const imageUrl = await FirebaseService.uploadImage(
+                            this.dataURLtoBlob(el.imageData),
+                            filename
+                        );
+                        processed.imageUrl = imageUrl;
+                        processed.imageData = undefined;
+                    } catch (uploadErr) {
+                        console.warn('Failed to upload image:', uploadErr);
+                    }
+                }
+                
+                return processed;
+            }));
+
             const data = {
-                elements: this.elements.map(el => ({
-                    ...el,
-                    image: undefined
-                })),
+                elements: processedElements,
                 connections: this.connections.map(c => ({
                     fromIndex: this.elements.indexOf(c.from),
                     toIndex: this.elements.indexOf(c.to),
@@ -2430,6 +2475,19 @@ class MindmapApp {
             console.error('Save error:', error);
             alert('Failed to save mindmap: ' + error.message);
         }
+    }
+
+    // Convert data URL to Blob for upload
+    dataURLtoBlob(dataURL) {
+        const arr = dataURL.split(',');
+        const mime = arr[0].match(/:(.*?);/)[1];
+        const bstr = atob(arr[1]);
+        let n = bstr.length;
+        const u8arr = new Uint8Array(n);
+        while (n--) {
+            u8arr[n] = bstr.charCodeAt(n);
+        }
+        return new Blob([u8arr], { type: mime });
     }
 
     showLoadModal() {
@@ -2494,50 +2552,65 @@ class MindmapApp {
     async loadMindmap(id) {
         try {
             const mindmap = await FirebaseService.loadMindmap(id);
-
-            // Handle both old format (array) and new format (object with elements/connections)
-            let elementsData, connectionsData;
-
-            if (Array.isArray(mindmap.data)) {
-                elementsData = mindmap.data;
-                connectionsData = [];
-            } else {
-                elementsData = mindmap.data.elements || [];
-                connectionsData = mindmap.data.connections || [];
-            }
-
-            this.elements = elementsData.map(el => {
-                if (el.type === 'image' && el.imageData) {
-                    const img = new Image();
-                    img.src = el.imageData;
-                    el.image = img;
-                }
-                return el;
-            });
-
-            // Recreate connections
-            this.connections = connectionsData
-                .filter(c => c.fromIndex >= 0 && c.toIndex >= 0 &&
-                            c.fromIndex < this.elements.length &&
-                            c.toIndex < this.elements.length)
-                .map(c => ({
-                    from: this.elements[c.fromIndex],
-                    to: this.elements[c.toIndex],
-                    strokeColor: c.strokeColor || '#666666',
-                    strokeWidth: c.strokeWidth || 2
-                }));
-
-            this.selectedElements = [];
-            this.history = [];
-            this.historyIndex = -1;
-            this.saveState();
-
+            this.loadMindmapData(mindmap.data);
             document.getElementById('loadModal').style.display = 'none';
-            this.render();
         } catch (error) {
             console.error('Load error:', error);
             alert('Failed to load mindmap: ' + error.message);
         }
+    }
+
+    loadMindmapData(data) {
+        // Handle both old format (array) and new format (object with elements/connections)
+        let elementsData, connectionsData;
+
+        if (Array.isArray(data)) {
+            elementsData = data;
+            connectionsData = [];
+        } else {
+            elementsData = data.elements || [];
+            connectionsData = data.connections || [];
+        }
+
+        this.elements = elementsData.map(el => {
+            // Handle standalone images
+            if (el.type === 'image') {
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                img.src = el.imageUrl || el.imageData;
+                img.onload = () => this.render();
+                el.image = img;
+            }
+            
+            // Handle embedded images in shapes
+            if (el.embeddedImage && (el.embeddedImage.url || el.embeddedImage.data)) {
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                img.src = el.embeddedImage.url || el.embeddedImage.data;
+                img.onload = () => this.render();
+                el.embeddedImage.image = img;
+            }
+            
+            return el;
+        });
+
+        // Recreate connections
+        this.connections = connectionsData
+            .filter(c => c.fromIndex >= 0 && c.toIndex >= 0 &&
+                        c.fromIndex < this.elements.length &&
+                        c.toIndex < this.elements.length)
+            .map(c => ({
+                from: this.elements[c.fromIndex],
+                to: this.elements[c.toIndex],
+                strokeColor: c.strokeColor || '#666666',
+                strokeWidth: c.strokeWidth || 2
+            }));
+
+        this.selectedElements = [];
+        this.history = [];
+        this.historyIndex = -1;
+        this.saveState();
+        this.render();
     }
 
     exportAsPng() {
