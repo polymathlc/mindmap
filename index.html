@@ -3,266 +3,465 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mindmap App</title>
-    <link rel="stylesheet" href="css/styles.css">
+    <title>Polymath Mindmap | Visual Learning Tool</title>
+    <meta name="description" content="Create beautiful mindmaps to organize your learning. Perfect for students to visualize concepts and submit assignments.">
+    <link rel="icon" type="image/png" href="https://www.dropbox.com/scl/fi/h40yjlyg8ldefwfaa3dib/polymath-logo-sticker.png?rlkey=o1ra4taqy79gt9t8u096v82zj&raw=1">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        /* Navigation */
+        .navbar {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 1rem 2rem;
+            position: fixed;
+            width: 100%;
+            top: 0;
+            z-index: 1000;
+            box-shadow: 0 2px 20px rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-decoration: none;
+        }
+
+        .logo img {
+            height: 45px;
+            width: auto;
+        }
+
+        .logo-text {
+            font-size: 1.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .nav-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px 28px;
+            border-radius: 30px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .nav-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 25px rgba(102, 126, 234, 0.5);
+        }
+
+        /* Hero Section */
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 100px 20px 60px;
+            text-align: center;
+        }
+
+        .hero-content {
+            max-width: 800px;
+        }
+
+        .hero-logo {
+            width: 150px;
+            height: 150px;
+            margin-bottom: 2rem;
+            border-radius: 30px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            background: white;
+            padding: 15px;
+        }
+
+        .hero h1 {
+            font-size: 3.5rem;
+            font-weight: 700;
+            color: white;
+            margin-bottom: 1.5rem;
+            text-shadow: 0 4px 30px rgba(0, 0, 0, 0.2);
+        }
+
+        .hero p {
+            font-size: 1.3rem;
+            color: rgba(255, 255, 255, 0.9);
+            margin-bottom: 2.5rem;
+            line-height: 1.8;
+        }
+
+        .cta-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 16px 40px;
+            border-radius: 50px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .btn-primary {
+            background: white;
+            color: #667eea;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 50px rgba(0, 0, 0, 0.3);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 2px solid rgba(255, 255, 255, 0.5);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-3px);
+        }
+
+        /* Features Section */
+        .features {
+            background: white;
+            padding: 80px 20px;
+        }
+
+        .section-title {
+            text-align: center;
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            color: #333;
+        }
+
+        .section-subtitle {
+            text-align: center;
+            font-size: 1.1rem;
+            color: #666;
+            margin-bottom: 4rem;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .feature-card {
+            background: #f8f9ff;
+            border-radius: 20px;
+            padding: 2.5rem;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 20px 50px rgba(102, 126, 234, 0.15);
+        }
+
+        .feature-icon {
+            font-size: 3.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .feature-card h3 {
+            font-size: 1.3rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: #333;
+        }
+
+        .feature-card p {
+            color: #666;
+            line-height: 1.7;
+        }
+
+        /* How It Works */
+        .how-it-works {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            padding: 80px 20px;
+        }
+
+        .steps {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            flex-wrap: wrap;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .step {
+            background: white;
+            border-radius: 20px;
+            padding: 2rem;
+            text-align: center;
+            flex: 1;
+            min-width: 250px;
+            max-width: 300px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
+        }
+
+        .step-number {
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin: 0 auto 1.5rem;
+        }
+
+        .step h3 {
+            font-size: 1.2rem;
+            margin-bottom: 0.75rem;
+            color: #333;
+        }
+
+        .step p {
+            color: #666;
+            font-size: 0.95rem;
+        }
+
+        /* CTA Section */
+        .cta-section {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 80px 20px;
+            text-align: center;
+        }
+
+        .cta-section h2 {
+            font-size: 2.5rem;
+            color: white;
+            margin-bottom: 1.5rem;
+        }
+
+        .cta-section p {
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 1.2rem;
+            margin-bottom: 2rem;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        /* Footer */
+        .footer {
+            background: #1a1a2e;
+            color: rgba(255, 255, 255, 0.7);
+            padding: 40px 20px;
+            text-align: center;
+        }
+
+        .footer-logo {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 1rem;
+        }
+
+        .footer-logo img {
+            height: 40px;
+            border-radius: 8px;
+        }
+
+        .footer-logo span {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: white;
+        }
+
+        .footer p {
+            font-size: 0.9rem;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .hero h1 {
+                font-size: 2.5rem;
+            }
+
+            .hero p {
+                font-size: 1.1rem;
+            }
+
+            .section-title {
+                font-size: 2rem;
+            }
+
+            .navbar {
+                padding: 0.75rem 1rem;
+            }
+
+            .logo-text {
+                font-size: 1.2rem;
+            }
+
+            .logo img {
+                height: 35px;
+            }
+        }
+
+        /* Animations */
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        .hero-logo {
+            animation: float 3s ease-in-out infinite;
+        }
+    </style>
 </head>
 <body>
-    <div id="app">
-        <!-- Toolbar -->
-        <div id="toolbar">
-            <div class="toolbar-section">
-                <h3>Mindmap</h3>
-            </div>
-            <div class="toolbar-section tools">
-                <button id="selectTool" class="tool-btn active" title="Select (V)">
-                    <span class="icon">↖</span> Select
-                </button>
-                <button id="rectTool" class="tool-btn" title="Rectangle (R)">
-                    <span class="icon">▭</span> Rectangle
-                </button>
-                <button id="circleTool" class="tool-btn" title="Circle (C)">
-                    <span class="icon">○</span> Circle
-                </button>
-                <button id="diamondTool" class="tool-btn" title="Diamond (D)">
-                    <span class="icon">◇</span> Diamond
-                </button>
-                <button id="triangleTool" class="tool-btn" title="Triangle (T)">
-                    <span class="icon">△</span> Triangle
-                </button>
-                <button id="arrowTool" class="tool-btn" title="Arrow (A)">
-                    <span class="icon">→</span> Arrow
-                </button>
-                <button id="lineTool" class="tool-btn" title="Line (L)">
-                    <span class="icon">—</span> Line
-                </button>
-                <button id="textTool" class="tool-btn" title="Text (X)">
-                    <span class="icon">T</span> Text
-                </button>
-            </div>
-            <div class="toolbar-section colors">
-                <label>Fill:</label>
-                <input type="color" id="fillColor" value="#BAE1FF">
-                <label>Stroke:</label>
-                <input type="color" id="strokeColor" value="#7AB8D9">
-                <label>Size:</label>
-                <input type="range" id="strokeWidth" min="1" max="10" value="2">
-            </div>
-            <div class="toolbar-section actions">
-                <button id="saveBtn" class="action-btn" title="Save to Firebase (Ctrl+S)">💾 Save</button>
-                <button id="loadBtn" class="action-btn" title="Load from Firebase (Ctrl+O)">📂 Load</button>
-                <button id="clearBtn" class="action-btn" title="Clear Canvas">🗑️ Clear</button>
-                <button id="exportBtn" class="action-btn" title="Export as PNG">📷 Export</button>
-            </div>
-            <div class="toolbar-section user-section">
-                <span id="userStatus">Not signed in</span>
-                <button id="adminBtn" class="action-btn admin-btn" style="display: none;">📋 Submissions</button>
-                <button id="signInBtn" class="action-btn">Sign In</button>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <a href="/" class="logo">
+            <img src="https://www.dropbox.com/scl/fi/h40yjlyg8ldefwfaa3dib/polymath-logo-sticker.png?rlkey=o1ra4taqy79gt9t8u096v82zj&raw=1" alt="Polymath Logo">
+            <span class="logo-text">Polymath Mindmap</span>
+        </a>
+        <a href="app.html" class="nav-btn">Launch App →</a>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="hero-content">
+            <img src="https://www.dropbox.com/scl/fi/h40yjlyg8ldefwfaa3dib/polymath-logo-sticker.png?rlkey=o1ra4taqy79gt9t8u096v82zj&raw=1" alt="Polymath Logo" class="hero-logo">
+            <h1>Visualize Your Learning</h1>
+            <p>Create beautiful mindmaps to organize concepts, connect ideas, and submit your work for review. The perfect tool for visual learners.</p>
+            <div class="cta-buttons">
+                <a href="app.html" class="btn btn-primary">
+                    🚀 Start Creating
+                </a>
+                <a href="#features" class="btn btn-secondary">
+                    Learn More
+                </a>
             </div>
         </div>
+    </section>
 
-        <!-- Shortcuts Help Panel -->
-        <div id="shortcutsPanel">
-            <h4>Keyboard Shortcuts</h4>
-            <ul>
-                <li><kbd>V</kbd> - Select tool</li>
-                <li><kbd>R</kbd> - Rectangle</li>
-                <li><kbd>C</kbd> - Circle</li>
-                <li><kbd>D</kbd> - Diamond</li>
-                <li><kbd>T</kbd> - Triangle</li>
-                <li><kbd>A</kbd> - Arrow (click origin, click target)</li>
-                <li><kbd>L</kbd> - Line</li>
-                <li><kbd>X</kbd> - Text</li>
-                <li><kbd>Tab</kbd> - Add child (next level)</li>
-                <li><kbd>Enter</kbd> - Add sibling (same level)</li>
-                <li><kbd>Delete</kbd> - Delete selected</li>
-                <li><kbd>Ctrl+C</kbd> - Copy</li>
-                <li><kbd>Ctrl+V</kbd> - Paste</li>
-                <li><kbd>Ctrl+Z</kbd> - Undo</li>
-                <li><kbd>Ctrl+Y</kbd> - Redo</li>
-                <li><kbd>Ctrl+S</kbd> - Save</li>
-                <li><kbd>Ctrl+O</kbd> - Load</li>
-                <li><kbd>Ctrl+A</kbd> - Select all</li>
-                <li><kbd>Esc</kbd> - Deselect / Cancel</li>
-            </ul>
-            <p class="tip">Type directly on selected shape to edit text!</p>
-            <p class="tip">Drag from green dots to connect shapes!</p>
-        </div>
-
-        <!-- Canvas Container -->
-        <div id="canvasContainer">
-            <canvas id="mindmapCanvas"></canvas>
-        </div>
-
-        <!-- Properties Panel -->
-        <div id="propertiesPanel">
-            <h4>Properties</h4>
-            <div id="noSelection">
-                <p>Select an element to edit its properties</p>
+    <!-- Features Section -->
+    <section class="features" id="features">
+        <h2 class="section-title">Why Polymath Mindmap?</h2>
+        <p class="section-subtitle">A powerful yet simple tool designed for students to visualize and organize their understanding</p>
+        
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon">🎨</div>
+                <h3>Easy to Use</h3>
+                <p>Intuitive drag-and-drop interface. Create shapes, add text, and connect ideas with just a few clicks.</p>
             </div>
-            <div id="elementProperties" style="display: none;">
-                <div class="property-group">
-                    <label>Text:</label>
-                    <textarea id="elementText" rows="3" placeholder="Enter text..."></textarea>
-                </div>
-                <div class="property-group">
-                    <label>Fill Color:</label>
-                    <input type="color" id="elementFill" value="#BAE1FF">
-                </div>
-                <div class="property-group">
-                    <label>Stroke Color:</label>
-                    <input type="color" id="elementStroke" value="#7AB8D9">
-                </div>
-                <div class="property-group">
-                    <label>Stroke Width:</label>
-                    <input type="range" id="elementStrokeWidth" min="1" max="10" value="2">
-                </div>
-                <div class="property-group">
-                    <label>Font Size:</label>
-                    <input type="number" id="elementFontSize" min="8" max="72" value="14">
-                </div>
-                <button id="deleteElement" class="action-btn danger">Delete Element</button>
+            <div class="feature-card">
+                <div class="feature-icon">☁️</div>
+                <h3>Cloud Save</h3>
+                <p>Your mindmaps are automatically saved to the cloud. Access them from any device, anytime.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">📤</div>
+                <h3>Submit for Review</h3>
+                <p>Easily submit your mindmaps to your teacher for marking and feedback.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🔷</div>
+                <h3>Multiple Shapes</h3>
+                <p>Rectangles, circles, diamonds, triangles — choose the perfect shape for each concept.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🔗</div>
+                <h3>Connect Ideas</h3>
+                <p>Draw arrows and lines to show relationships between concepts.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">📷</div>
+                <h3>Export as Image</h3>
+                <p>Download your mindmap as a PNG image to include in presentations or documents.</p>
             </div>
         </div>
+    </section>
 
-        <!-- Load Modal -->
-        <div id="loadModal" class="modal" style="display: none;">
-            <div class="modal-content">
-                <h3>Load Mindmap</h3>
-                <div id="mindmapList">
-                    <p>Loading...</p>
-                </div>
-                <div class="modal-actions">
-                    <button id="closeLoadModal" class="action-btn">Cancel</button>
-                </div>
+    <!-- How It Works -->
+    <section class="how-it-works">
+        <h2 class="section-title">How It Works</h2>
+        <p class="section-subtitle">Get started in just 3 simple steps</p>
+        
+        <div class="steps">
+            <div class="step">
+                <div class="step-number">1</div>
+                <h3>Sign In</h3>
+                <p>Create an account with your email or sign in with Google</p>
+            </div>
+            <div class="step">
+                <div class="step-number">2</div>
+                <h3>Create Your Mindmap</h3>
+                <p>Add shapes, type your ideas, and connect them with arrows</p>
+            </div>
+            <div class="step">
+                <div class="step-number">3</div>
+                <h3>Save & Submit</h3>
+                <p>Save your work to the cloud for your teacher to review</p>
             </div>
         </div>
+    </section>
 
-        <!-- Save Modal -->
-        <div id="saveModal" class="modal" style="display: none;">
-            <div class="modal-content">
-                <h3>Save Mindmap</h3>
-                <div class="property-group">
-                    <label>Name:</label>
-                    <input type="text" id="mindmapName" placeholder="My Mindmap">
-                </div>
-                <div class="modal-actions">
-                    <button id="confirmSave" class="action-btn">Save</button>
-                    <button id="closeSaveModal" class="action-btn">Cancel</button>
-                </div>
-            </div>
+    <!-- CTA Section -->
+    <section class="cta-section">
+        <h2>Ready to Start?</h2>
+        <p>Join your classmates and start creating amazing mindmaps today!</p>
+        <a href="app.html" class="btn btn-primary">
+            🎯 Launch Mindmap App
+        </a>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-logo">
+            <img src="https://www.dropbox.com/scl/fi/h40yjlyg8ldefwfaa3dib/polymath-logo-sticker.png?rlkey=o1ra4taqy79gt9t8u096v82zj&raw=1" alt="Polymath">
+            <span>Polymath Learning Centre</span>
         </div>
-
-        <!-- Login Modal -->
-        <div id="loginModal" class="modal" style="display: none;">
-            <div class="modal-content">
-                <h3 id="loginModalTitle">Sign In</h3>
-                
-                <!-- Login Form -->
-                <div id="loginForm">
-                    <div class="property-group">
-                        <label>Email:</label>
-                        <input type="email" id="loginEmail" placeholder="your@email.com">
-                    </div>
-                    <div class="property-group">
-                        <label>Password:</label>
-                        <input type="password" id="loginPassword" placeholder="Password">
-                    </div>
-                    <div id="loginError" class="error-message" style="display: none;"></div>
-                    <div class="modal-actions">
-                        <button id="submitLogin" class="action-btn primary">Sign In</button>
-                    </div>
-                    <div class="auth-divider">
-                        <span>or</span>
-                    </div>
-                    <button id="googleSignIn" class="action-btn google-btn">
-                        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" width="18">
-                        Sign in with Google
-                    </button>
-                    <div class="auth-links">
-                        <a href="#" id="showRegister">Create an account</a>
-                        <a href="#" id="showForgotPassword">Forgot password?</a>
-                    </div>
-                </div>
-
-                <!-- Register Form -->
-                <div id="registerForm" style="display: none;">
-                    <div class="property-group">
-                        <label>Email:</label>
-                        <input type="email" id="registerEmail" placeholder="your@email.com">
-                    </div>
-                    <div class="property-group">
-                        <label>Password:</label>
-                        <input type="password" id="registerPassword" placeholder="Password (min 6 characters)">
-                    </div>
-                    <div class="property-group">
-                        <label>Confirm Password:</label>
-                        <input type="password" id="confirmPassword" placeholder="Confirm password">
-                    </div>
-                    <div id="registerError" class="error-message" style="display: none;"></div>
-                    <div class="modal-actions">
-                        <button id="submitRegister" class="action-btn primary">Create Account</button>
-                    </div>
-                    <div class="auth-links">
-                        <a href="#" id="showLogin">Already have an account? Sign in</a>
-                    </div>
-                </div>
-
-                <!-- Forgot Password Form -->
-                <div id="forgotPasswordForm" style="display: none;">
-                    <p>Enter your email to receive a password reset link.</p>
-                    <div class="property-group">
-                        <label>Email:</label>
-                        <input type="email" id="resetEmail" placeholder="your@email.com">
-                    </div>
-                    <div id="resetError" class="error-message" style="display: none;"></div>
-                    <div id="resetSuccess" class="success-message" style="display: none;"></div>
-                    <div class="modal-actions">
-                        <button id="submitReset" class="action-btn primary">Send Reset Link</button>
-                    </div>
-                    <div class="auth-links">
-                        <a href="#" id="showLoginFromReset">Back to sign in</a>
-                    </div>
-                </div>
-
-                <!-- Verification Pending -->
-                <div id="verificationPending" style="display: none;">
-                    <div class="verification-icon">📧</div>
-                    <h4>Verify Your Email</h4>
-                    <p>We've sent a verification email to <strong id="verificationEmail"></strong></p>
-                    <p>Please check your inbox and click the verification link.</p>
-                    <div class="modal-actions">
-                        <button id="resendVerification" class="action-btn">Resend Email</button>
-                        <button id="checkVerification" class="action-btn primary">I've Verified</button>
-                    </div>
-                    <div class="auth-links">
-                        <a href="#" id="backToLogin">Back to sign in</a>
-                    </div>
-                </div>
-
-                <button id="closeLoginModal" class="close-modal-btn">&times;</button>
-            </div>
-        </div>
-
-        <!-- Admin Panel (for viewing all student mindmaps) -->
-        <div id="adminPanel" style="display: none;">
-            <div class="admin-header">
-                <h3>📋 Student Submissions</h3>
-                <button id="closeAdminPanel" class="action-btn">Close</button>
-            </div>
-            <div id="adminMindmapList">
-                <p>Loading submissions...</p>
-            </div>
-        </div>
-    </div>
-
-    <!-- Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
-
-    <!-- App Scripts -->
-    <script src="js/firebase-config.js"></script>
-    <script src="js/app.js"></script>
+        <p>© 2024 Polymath Learning Centre. Empowering students to learn better.</p>
+    </footer>
 </body>
 </html>

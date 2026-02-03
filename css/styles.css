@@ -43,6 +43,23 @@ body {
     font-weight: 600;
 }
 
+.app-logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+}
+
+.app-logo img {
+    height: 32px;
+    width: auto;
+    border-radius: 6px;
+}
+
+.app-logo:hover {
+    opacity: 0.9;
+}
+
 .toolbar-section.tools {
     background: rgba(108, 92, 231, 0.08);
     padding: 5px 10px;
