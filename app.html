@@ -52,7 +52,7 @@
             </div>
             <div class="toolbar-section actions">
                 <button id="saveBtn" class="action-btn" title="Save draft (Ctrl+S)">💾 Save</button>
-                <button id="loadBtn" class="action-btn" title="Load saved (Ctrl+O)">📂 My Drafts</button>
+                <button id="loadBtn" class="action-btn" title="Load saved (Ctrl+O)">📂 Saved Maps</button>
                 <button id="submitBtn" class="action-btn submit-btn" title="Submit to teacher">📤 Submit</button>
                 <button id="clearBtn" class="action-btn" title="Clear Canvas">🗑️ Clear</button>
                 <button id="exportBtn" class="action-btn" title="Export as PNG">📷 Export</button>
@@ -145,7 +145,7 @@
         <!-- Load Modal -->
         <div id="loadModal" class="modal" style="display: none;">
             <div class="modal-content">
-                <h3>Load Mindmap</h3>
+                <h3>📂 Saved Maps</h3>
                 <div id="mindmapList">
                     <p>Loading...</p>
                 </div>
@@ -299,6 +299,9 @@
         </div>
     </div>
 
+    <!-- html2canvas for screenshot export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>

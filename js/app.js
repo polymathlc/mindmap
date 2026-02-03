@@ -2701,23 +2701,52 @@ class MindmapApp {
             connectionsData = data.connections || [];
         }
 
+        // Track pending image loads
+        let pendingImages = 0;
+        const checkRender = () => {
+            pendingImages--;
+            if (pendingImages <= 0) {
+                this.render();
+            }
+        };
+
         this.elements = elementsData.map(el => {
             // Handle standalone images
             if (el.type === 'image') {
-                const img = new Image();
-                img.crossOrigin = 'anonymous';
-                img.src = el.imageUrl || el.imageData;
-                img.onload = () => this.render();
-                el.image = img;
+                const imgSrc = el.imageUrl || el.imageData;
+                if (imgSrc) {
+                    pendingImages++;
+                    const img = new Image();
+                    img.crossOrigin = 'anonymous';
+                    img.onload = () => {
+                        el.image = img;
+                        checkRender();
+                    };
+                    img.onerror = () => {
+                        console.warn('Failed to load image:', imgSrc);
+                        checkRender();
+                    };
+                    img.src = imgSrc;
+                }
             }
             
             // Handle embedded images in shapes
-            if (el.embeddedImage && (el.embeddedImage.url || el.embeddedImage.data)) {
-                const img = new Image();
-                img.crossOrigin = 'anonymous';
-                img.src = el.embeddedImage.url || el.embeddedImage.data;
-                img.onload = () => this.render();
-                el.embeddedImage.image = img;
+            if (el.embeddedImage) {
+                const imgSrc = el.embeddedImage.url || el.embeddedImage.data;
+                if (imgSrc) {
+                    pendingImages++;
+                    const img = new Image();
+                    img.crossOrigin = 'anonymous';
+                    img.onload = () => {
+                        el.embeddedImage.image = img;
+                        checkRender();
+                    };
+                    img.onerror = () => {
+                        console.warn('Failed to load embedded image:', imgSrc);
+                        checkRender();
+                    };
+                    img.src = imgSrc;
+                }
             }
             
             return el;
@@ -2739,83 +2768,113 @@ class MindmapApp {
         this.history = [];
         this.historyIndex = -1;
         this.saveState();
+        
+        // Render immediately, images will re-render when loaded
         this.render();
     }
 
-    exportAsPng() {
-        // Create a temporary canvas with white background
-        const tempCanvas = document.createElement('canvas');
-        const tempCtx = tempCanvas.getContext('2d');
-
-        // Calculate bounds
-        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-
-        this.elements.forEach(el => {
-            const bounds = this.getElementBounds(el);
-            minX = Math.min(minX, bounds.x);
-            minY = Math.min(minY, bounds.y);
-            maxX = Math.max(maxX, bounds.x + bounds.width);
-            maxY = Math.max(maxY, bounds.y + bounds.height);
-        });
-
-        if (this.elements.length === 0) {
-            minX = 0;
-            minY = 0;
-            maxX = 400;
-            maxY = 300;
+    async exportAsPng() {
+        // Use html2canvas for high-quality screenshot export
+        if (typeof html2canvas === 'undefined') {
+            alert('Export library not loaded. Please refresh the page.');
+            return;
         }
 
-        const padding = 50;
-        const exportScale = 2; // Export at 2x for crisp images
-        const width = (maxX - minX + padding * 2) * exportScale;
-        const height = (maxY - minY + padding * 2) * exportScale;
+        if (this.elements.length === 0) {
+            alert('Please create a mindmap before exporting.');
+            return;
+        }
 
-        tempCanvas.width = width;
-        tempCanvas.height = height;
+        this.showLoading('Exporting high-quality image...');
 
-        // White background
-        tempCtx.fillStyle = '#ffffff';
-        tempCtx.fillRect(0, 0, width, height);
+        try {
+            // Calculate bounds of all elements
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
 
-        // Scale for high-res export
-        tempCtx.scale(exportScale, exportScale);
-        
-        // Translate to fit content
-        tempCtx.translate(-minX + padding, -minY + padding);
+            this.elements.forEach(el => {
+                const bounds = this.getElementBounds(el);
+                minX = Math.min(minX, bounds.x);
+                minY = Math.min(minY, bounds.y);
+                maxX = Math.max(maxX, bounds.x + bounds.width);
+                maxY = Math.max(maxY, bounds.y + bounds.height);
+            });
 
-        // Save original state
-        const originalCtx = this.ctx;
-        const originalDpr = this.dpr;
-        const originalPanOffset = { ...this.panOffset };
-        const originalZoom = this.zoom;
-        
-        // Set export context (no pan/zoom, dpr=1 since we're scaling manually)
-        this.ctx = tempCtx;
-        this.dpr = 1;
-        this.panOffset = { x: 0, y: 0 };
-        this.zoom = 1;
+            const padding = 60;
+            const exportWidth = maxX - minX + padding * 2;
+            const exportHeight = maxY - minY + padding * 2;
 
-        // Draw connections
-        this.connections.forEach(connection => {
-            if (this.elements.includes(connection.from) && this.elements.includes(connection.to)) {
-                this.drawConnection(connection);
-            }
-        });
+            // Create a high-res export canvas
+            const scale = 3; // 3x for high definition
+            const tempCanvas = document.createElement('canvas');
+            const tempCtx = tempCanvas.getContext('2d');
+            
+            tempCanvas.width = exportWidth * scale;
+            tempCanvas.height = exportHeight * scale;
 
-        // Draw elements (without selection indicators)
-        this.elements.forEach(el => this.drawElement(el));
-        
-        // Restore original state
-        this.ctx = originalCtx;
-        this.dpr = originalDpr;
-        this.panOffset = originalPanOffset;
-        this.zoom = originalZoom;
+            // White background
+            tempCtx.fillStyle = '#ffffff';
+            tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
 
-        // Download
-        const link = document.createElement('a');
-        link.download = 'mindmap.png';
-        link.href = tempCanvas.toDataURL('image/png');
-        link.click();
+            // Scale up for high-res
+            tempCtx.scale(scale, scale);
+            
+            // Translate to fit content with padding
+            tempCtx.translate(-minX + padding, -minY + padding);
+
+            // Save original state
+            const originalCtx = this.ctx;
+            const originalDpr = this.dpr;
+            const originalPanOffset = { ...this.panOffset };
+            const originalZoom = this.zoom;
+            const originalSelected = [...this.selectedElements];
+            
+            // Clear selection for clean export
+            this.selectedElements = [];
+            
+            // Set export context
+            this.ctx = tempCtx;
+            this.dpr = 1;
+            this.panOffset = { x: 0, y: 0 };
+            this.zoom = 1;
+
+            // Draw connections first (behind shapes)
+            this.connections.forEach(connection => {
+                if (this.elements.includes(connection.from) && this.elements.includes(connection.to)) {
+                    this.drawConnection(connection);
+                }
+            });
+
+            // Draw all elements
+            this.elements.forEach(el => this.drawElement(el));
+            
+            // Restore original state
+            this.ctx = originalCtx;
+            this.dpr = originalDpr;
+            this.panOffset = originalPanOffset;
+            this.zoom = originalZoom;
+            this.selectedElements = originalSelected;
+            
+            // Re-render the main canvas
+            this.render();
+
+            // Convert to blob for better quality
+            tempCanvas.toBlob((blob) => {
+                this.hideLoading();
+                
+                const link = document.createElement('a');
+                link.download = `mindmap_${Date.now()}.png`;
+                link.href = URL.createObjectURL(blob);
+                link.click();
+                
+                // Cleanup
+                URL.revokeObjectURL(link.href);
+            }, 'image/png', 1.0);
+
+        } catch (error) {
+            this.hideLoading();
+            console.error('Export error:', error);
+            alert('Failed to export: ' + error.message);
+        }
     }
 
     // Auth Setup
