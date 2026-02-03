@@ -313,7 +313,7 @@ class MindmapApp {
         }
 
         if (this.isResizing && this.resizeHandle) {
-            this.handleResize(pos);
+            this.handleResize(pos, e.shiftKey);
             this.render();
             return;
         }
@@ -1359,17 +1359,22 @@ class MindmapApp {
         const availableWidth = element.width - padding * 2;
         const availableHeight = element.height - padding * 2;
         
+        // Use custom scale if set, otherwise calculate to fit
+        const customScale = img.scale || 1;
+        
         let maxWidth, maxHeight;
         
         if (pos === 'left' || pos === 'right') {
-            maxWidth = availableWidth * 0.4;
-            maxHeight = availableHeight * 0.8;
+            maxWidth = availableWidth * 0.5;  // Increased from 0.4
+            maxHeight = availableHeight * 0.9; // Increased from 0.8
         } else {
-            maxWidth = availableWidth * 0.8;
-            maxHeight = availableHeight * 0.5;
+            maxWidth = availableWidth * 0.95;  // Increased from 0.8
+            maxHeight = availableHeight * 0.7; // Increased from 0.5
         }
 
-        const ratio = Math.min(maxWidth / img.originalWidth, maxHeight / img.originalHeight, 1);
+        const fitRatio = Math.min(maxWidth / img.originalWidth, maxHeight / img.originalHeight, 1);
+        const ratio = fitRatio * customScale;
+        
         return {
             width: img.originalWidth * ratio,
             height: img.originalHeight * ratio
@@ -1568,7 +1573,7 @@ class MindmapApp {
         return null;
     }
 
-    handleResize(pos) {
+    handleResize(pos, shiftKey = false) {
         const { element, handle } = this.resizeHandle;
 
         if (element.type === 'arrow' || element.type === 'line') {
@@ -1583,6 +1588,7 @@ class MindmapApp {
         }
 
         const bounds = this.getElementBounds(element);
+        const originalRatio = element.width / element.height;
         let newX = element.x;
         let newY = element.y;
         let newWidth = element.width;
@@ -1623,6 +1629,27 @@ class MindmapApp {
                 newWidth = bounds.x + bounds.width - pos.x;
                 newX = pos.x;
                 break;
+        }
+
+        // Shift key: maintain aspect ratio (proportional resize)
+        if (shiftKey && ['nw', 'ne', 'se', 'sw'].includes(handle.type)) {
+            // Use the larger dimension change to determine scale
+            const widthRatio = newWidth / element.width;
+            const heightRatio = newHeight / element.height;
+            const scale = Math.max(widthRatio, heightRatio);
+            
+            newWidth = element.width * scale;
+            newHeight = element.height * scale;
+            
+            // Adjust position for corner handles
+            if (handle.type === 'nw') {
+                newX = bounds.x + bounds.width - newWidth;
+                newY = bounds.y + bounds.height - newHeight;
+            } else if (handle.type === 'ne') {
+                newY = bounds.y + bounds.height - newHeight;
+            } else if (handle.type === 'sw') {
+                newX = bounds.x + bounds.width - newWidth;
+            }
         }
 
         // Minimum size
@@ -2272,6 +2299,23 @@ class MindmapApp {
                 }
             });
         }
+
+        // Image scale slider
+        const imgScaleSlider = document.getElementById('imgScale');
+        const imgScaleValue = document.getElementById('imgScaleValue');
+        if (imgScaleSlider) {
+            imgScaleSlider.addEventListener('input', () => {
+                if (this.selectedElements.length === 1 && this.selectedElements[0].embeddedImage) {
+                    const scale = parseInt(imgScaleSlider.value) / 100;
+                    this.selectedElements[0].embeddedImage.scale = scale;
+                    imgScaleValue.textContent = imgScaleSlider.value + '%';
+                    this.render();
+                }
+            });
+            imgScaleSlider.addEventListener('change', () => {
+                this.saveState();
+            });
+        }
     }
 
     updatePropertyPanel() {
@@ -2303,6 +2347,15 @@ class MindmapApp {
             document.querySelectorAll('.pos-btn').forEach(btn => btn.classList.remove('active'));
             const posBtn = document.getElementById(`imgPos${pos.charAt(0).toUpperCase() + pos.slice(1)}`);
             if (posBtn) posBtn.classList.add('active');
+            
+            // Set image scale slider
+            const scale = element.embeddedImage.scale || 1;
+            const imgScaleSlider = document.getElementById('imgScale');
+            const imgScaleValue = document.getElementById('imgScaleValue');
+            if (imgScaleSlider) {
+                imgScaleSlider.value = Math.round(scale * 100);
+                imgScaleValue.textContent = Math.round(scale * 100) + '%';
+            }
         } else if (imagePositionGroup) {
             imagePositionGroup.style.display = 'none';
         }
