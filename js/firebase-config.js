@@ -147,16 +147,19 @@ const FirebaseService = {
             throw new Error('User not authenticated');
         }
 
+        // Simple query without orderBy to avoid index requirement
         const snapshot = await db.collection('mindmaps')
             .where('userId', '==', user.uid)
-            .orderBy('updatedAt', 'desc')
             .get();
 
-        return snapshot.docs.map(doc => ({
+        // Sort client-side
+        const docs = snapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data(),
             updatedAt: doc.data().updatedAt?.toDate() || new Date()
         }));
+        
+        return docs.sort((a, b) => b.updatedAt - a.updatedAt);
     },
 
     // Load specific mindmap
@@ -192,15 +195,16 @@ const FirebaseService = {
             throw new Error('Admin access required');
         }
 
-        const snapshot = await db.collection('mindmaps')
-            .orderBy('updatedAt', 'desc')
-            .get();
+        const snapshot = await db.collection('mindmaps').get();
 
-        return snapshot.docs.map(doc => ({
+        // Sort client-side
+        const docs = snapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data(),
             updatedAt: doc.data().updatedAt?.toDate() || new Date()
         }));
+        
+        return docs.sort((a, b) => b.updatedAt - a.updatedAt);
     },
 
     // Admin: Load mindmaps by user email
@@ -257,15 +261,16 @@ const FirebaseService = {
             throw new Error('Admin access required');
         }
 
-        const snapshot = await db.collection('submissions')
-            .orderBy('submittedAt', 'desc')
-            .get();
+        const snapshot = await db.collection('submissions').get();
 
-        return snapshot.docs.map(doc => ({
+        // Sort client-side
+        const docs = snapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data(),
             submittedAt: doc.data().submittedAt?.toDate() || new Date()
         }));
+        
+        return docs.sort((a, b) => b.submittedAt - a.submittedAt);
     },
 
     // Admin: Load specific submission
