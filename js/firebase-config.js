@@ -100,7 +100,7 @@ const FirebaseService = {
     },
 
     // Save mindmap to Firestore
-    async saveMindmap(name, data) {
+    async saveMindmap(name, data, thumbnailUrl = null) {
         if (!db) {
             throw new Error('Firebase not initialized');
         }
@@ -117,6 +117,11 @@ const FirebaseService = {
             updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
         };
+
+        // Add thumbnail if provided
+        if (thumbnailUrl) {
+            mindmapData.thumbnail = thumbnailUrl;
+        }
 
         // Check if mindmap with same name exists
         const existingQuery = await db.collection('mindmaps')
