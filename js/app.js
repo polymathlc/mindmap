@@ -2432,53 +2432,25 @@ class MindmapApp {
         }
 
         try {
-            // Process elements - upload embedded images to Storage
-            const processedElements = await Promise.all(this.elements.map(async (el, index) => {
+            // Process elements - keep base64 data for reliable loading
+            const processedElements = this.elements.map(el => {
                 const processed = { ...el, image: undefined };
                 
-                // Upload embedded images to Firebase Storage
-                if (el.embeddedImage && el.embeddedImage.data) {
-                    try {
-                        const filename = `embedded_${index}_${Date.now()}.png`;
-                        const imageUrl = await FirebaseService.uploadImage(
-                            this.dataURLtoBlob(el.embeddedImage.data),
-                            filename
-                        );
-                        processed.embeddedImage = {
-                            ...el.embeddedImage,
-                            url: imageUrl,
-                            data: undefined, // Don't save base64
-                            image: undefined
-                        };
-                    } catch (uploadErr) {
-                        console.warn('Failed to upload embedded image:', uploadErr);
-                        // Keep minimal data without base64
-                        processed.embeddedImage = {
-                            position: el.embeddedImage.position,
-                            scale: el.embeddedImage.scale,
-                            originalWidth: el.embeddedImage.originalWidth,
-                            originalHeight: el.embeddedImage.originalHeight
-                        };
-                    }
+                // Keep embedded image data (base64) for reliable loading
+                if (el.embeddedImage) {
+                    processed.embeddedImage = {
+                        ...el.embeddedImage,
+                        image: undefined // Don't serialize Image object
+                    };
                 }
                 
-                // Handle standalone images
-                if (el.type === 'image' && el.imageData) {
-                    try {
-                        const filename = `image_${index}_${Date.now()}.png`;
-                        const imageUrl = await FirebaseService.uploadImage(
-                            this.dataURLtoBlob(el.imageData),
-                            filename
-                        );
-                        processed.imageUrl = imageUrl;
-                        processed.imageData = undefined;
-                    } catch (uploadErr) {
-                        console.warn('Failed to upload image:', uploadErr);
-                    }
+                // Keep standalone image data
+                if (el.type === 'image') {
+                    processed.image = undefined; // Don't serialize Image object
                 }
                 
                 return processed;
-            }));
+            });
 
             const data = {
                 elements: processedElements,
@@ -2713,17 +2685,20 @@ class MindmapApp {
         this.elements = elementsData.map(el => {
             // Handle standalone images
             if (el.type === 'image') {
-                const imgSrc = el.imageUrl || el.imageData;
+                const imgSrc = el.imageData || el.imageUrl;
                 if (imgSrc) {
                     pendingImages++;
                     const img = new Image();
-                    img.crossOrigin = 'anonymous';
+                    // Only set crossOrigin for URLs (not base64)
+                    if (imgSrc.startsWith('http')) {
+                        img.crossOrigin = 'anonymous';
+                    }
                     img.onload = () => {
                         el.image = img;
                         checkRender();
                     };
                     img.onerror = () => {
-                        console.warn('Failed to load image:', imgSrc);
+                        console.warn('Failed to load image:', imgSrc.substring(0, 100));
                         checkRender();
                     };
                     img.src = imgSrc;
@@ -2732,17 +2707,20 @@ class MindmapApp {
             
             // Handle embedded images in shapes
             if (el.embeddedImage) {
-                const imgSrc = el.embeddedImage.url || el.embeddedImage.data;
+                const imgSrc = el.embeddedImage.data || el.embeddedImage.url;
                 if (imgSrc) {
                     pendingImages++;
                     const img = new Image();
-                    img.crossOrigin = 'anonymous';
+                    // Only set crossOrigin for URLs (not base64)
+                    if (imgSrc.startsWith('http')) {
+                        img.crossOrigin = 'anonymous';
+                    }
                     img.onload = () => {
                         el.embeddedImage.image = img;
                         checkRender();
                     };
                     img.onerror = () => {
-                        console.warn('Failed to load embedded image:', imgSrc);
+                        console.warn('Failed to load embedded image:', imgSrc.substring(0, 100));
                         checkRender();
                     };
                     img.src = imgSrc;
