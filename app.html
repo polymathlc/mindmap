@@ -51,8 +51,9 @@
                 <input type="range" id="strokeWidth" min="1" max="10" value="2">
             </div>
             <div class="toolbar-section actions">
-                <button id="saveBtn" class="action-btn" title="Save to Firebase (Ctrl+S)">💾 Save</button>
-                <button id="loadBtn" class="action-btn" title="Load from Firebase (Ctrl+O)">📂 Load</button>
+                <button id="saveBtn" class="action-btn" title="Save draft (Ctrl+S)">💾 Save</button>
+                <button id="loadBtn" class="action-btn" title="Load saved (Ctrl+O)">📂 My Drafts</button>
+                <button id="submitBtn" class="action-btn submit-btn" title="Submit to teacher">📤 Submit</button>
                 <button id="clearBtn" class="action-btn" title="Clear Canvas">🗑️ Clear</button>
                 <button id="exportBtn" class="action-btn" title="Export as PNG">📷 Export</button>
             </div>
@@ -257,6 +258,32 @@
                 </div>
 
                 <button id="closeLoginModal" class="close-modal-btn">&times;</button>
+            </div>
+        </div>
+
+        <!-- Loading Overlay -->
+        <div id="loadingOverlay" class="loading-overlay" style="display: none;">
+            <div class="loading-spinner"></div>
+            <div class="loading-text">Saving...</div>
+        </div>
+
+        <!-- Submit Modal -->
+        <div id="submitModal" class="modal" style="display: none;">
+            <div class="modal-content">
+                <h3>📤 Submit to Teacher</h3>
+                <p style="margin-bottom: 15px; color: #666;">Once submitted, your teacher will be able to view and mark your mindmap.</p>
+                <div class="property-group">
+                    <label>Mindmap Title:</label>
+                    <input type="text" id="submitMindmapName" placeholder="e.g. Water Cycle">
+                </div>
+                <div class="property-group">
+                    <label>Your Name:</label>
+                    <input type="text" id="studentName" placeholder="e.g. John Tan">
+                </div>
+                <div class="modal-actions">
+                    <button id="confirmSubmit" class="action-btn submit-btn">Submit</button>
+                    <button id="closeSubmitModal" class="action-btn">Cancel</button>
+                </div>
             </div>
         </div>
 

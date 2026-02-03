@@ -2183,8 +2183,21 @@ class MindmapApp {
         // Action buttons
         document.getElementById('saveBtn').addEventListener('click', () => this.showSaveModal());
         document.getElementById('loadBtn').addEventListener('click', () => this.showLoadModal());
+        document.getElementById('submitBtn').addEventListener('click', () => this.showSubmitModal());
         document.getElementById('clearBtn').addEventListener('click', () => this.clearCanvas());
         document.getElementById('exportBtn').addEventListener('click', () => this.exportAsPng());
+    }
+
+    // Loading overlay
+    showLoading(text = 'Saving...') {
+        const overlay = document.getElementById('loadingOverlay');
+        const loadingText = overlay.querySelector('.loading-text');
+        loadingText.textContent = text;
+        overlay.style.display = 'flex';
+    }
+
+    hideLoading() {
+        document.getElementById('loadingOverlay').style.display = 'none';
     }
 
     setTool(tool) {
@@ -2377,6 +2390,15 @@ class MindmapApp {
             document.getElementById('loadModal').style.display = 'none';
         });
 
+        // Submit Modal
+        document.getElementById('closeSubmitModal').addEventListener('click', () => {
+            document.getElementById('submitModal').style.display = 'none';
+        });
+
+        document.getElementById('confirmSubmit').addEventListener('click', () => {
+            this.submitMindmap();
+        });
+
         // Close modals on background click
         document.querySelectorAll('.modal').forEach(modal => {
             modal.addEventListener('click', (e) => {
@@ -2468,12 +2490,119 @@ class MindmapApp {
                 }))
             };
 
-            await FirebaseService.saveMindmap(name, data);
             document.getElementById('saveModal').style.display = 'none';
-            alert('Mindmap saved successfully!');
+            this.showLoading('Saving...');
+            
+            await FirebaseService.saveMindmap(name, data);
+            this.hideLoading();
+            alert('✅ Draft saved successfully!');
         } catch (error) {
+            this.hideLoading();
             console.error('Save error:', error);
             alert('Failed to save mindmap: ' + error.message);
+        }
+    }
+
+    // Submit Modal
+    showSubmitModal() {
+        if (!FirebaseService.isConfigured()) {
+            alert('Firebase is not configured.');
+            return;
+        }
+
+        if (!FirebaseService.getCurrentUser()) {
+            alert('Please sign in to submit your mindmap.');
+            return;
+        }
+
+        if (this.elements.length === 0) {
+            alert('Please create a mindmap before submitting.');
+            return;
+        }
+
+        document.getElementById('submitModal').style.display = 'flex';
+        document.getElementById('submitMindmapName').focus();
+    }
+
+    async submitMindmap() {
+        const name = document.getElementById('submitMindmapName').value.trim();
+        const studentName = document.getElementById('studentName').value.trim();
+        
+        if (!name) {
+            alert('Please enter a title for your mindmap.');
+            return;
+        }
+        if (!studentName) {
+            alert('Please enter your name.');
+            return;
+        }
+
+        try {
+            // Process elements - upload embedded images to Storage
+            const processedElements = await Promise.all(this.elements.map(async (el, index) => {
+                const processed = { ...el, image: undefined };
+                
+                if (el.embeddedImage && el.embeddedImage.data) {
+                    try {
+                        const filename = `submit_${index}_${Date.now()}.png`;
+                        const imageUrl = await FirebaseService.uploadImage(
+                            this.dataURLtoBlob(el.embeddedImage.data),
+                            filename
+                        );
+                        processed.embeddedImage = {
+                            ...el.embeddedImage,
+                            url: imageUrl,
+                            data: undefined,
+                            image: undefined
+                        };
+                    } catch (uploadErr) {
+                        console.warn('Failed to upload embedded image:', uploadErr);
+                        processed.embeddedImage = {
+                            position: el.embeddedImage.position,
+                            scale: el.embeddedImage.scale,
+                            originalWidth: el.embeddedImage.originalWidth,
+                            originalHeight: el.embeddedImage.originalHeight
+                        };
+                    }
+                }
+                
+                if (el.type === 'image' && el.imageData) {
+                    try {
+                        const filename = `submit_img_${index}_${Date.now()}.png`;
+                        const imageUrl = await FirebaseService.uploadImage(
+                            this.dataURLtoBlob(el.imageData),
+                            filename
+                        );
+                        processed.imageUrl = imageUrl;
+                        processed.imageData = undefined;
+                    } catch (uploadErr) {
+                        console.warn('Failed to upload image:', uploadErr);
+                    }
+                }
+                
+                return processed;
+            }));
+
+            const data = {
+                elements: processedElements,
+                connections: this.connections.map(c => ({
+                    fromIndex: this.elements.indexOf(c.from),
+                    toIndex: this.elements.indexOf(c.to),
+                    strokeColor: c.strokeColor,
+                    strokeWidth: c.strokeWidth
+                }))
+            };
+
+            document.getElementById('submitModal').style.display = 'none';
+            this.showLoading('Submitting to teacher...');
+            
+            await FirebaseService.submitMindmap(name, studentName, data);
+            this.hideLoading();
+            alert('✅ Mindmap submitted successfully! Your teacher will review it.');
+        } catch (error) {
+            this.hideLoading();
+            console.error('Submit error:', error);
+            alert('Failed to submit mindmap: ' + error.message);
         }
     }
 
@@ -2966,34 +3095,36 @@ class MindmapApp {
         // Admin panel button
         adminBtn.addEventListener('click', async () => {
             adminPanel.style.display = 'block';
-            adminMindmapList.innerHTML = '<p>Loading submissions...</p>';
+            adminMindmapList.innerHTML = '<p>Loading student submissions...</p>';
             
             try {
-                const mindmaps = await FirebaseService.loadAllMindmaps();
-                if (mindmaps.length === 0) {
-                    adminMindmapList.innerHTML = '<p>No submissions yet.</p>';
+                const submissions = await FirebaseService.loadAllSubmissions();
+                if (submissions.length === 0) {
+                    adminMindmapList.innerHTML = '<p>No student submissions yet.</p>';
                 } else {
-                    adminMindmapList.innerHTML = mindmaps.map(m => `
-                        <div class="admin-mindmap-item" data-id="${m.id}">
+                    adminMindmapList.innerHTML = submissions.map(s => `
+                        <div class="admin-mindmap-item" data-id="${s.id}">
                             <div class="info">
-                                <div class="name">${m.name || 'Untitled'}</div>
-                                <div class="email">${m.userEmail || 'Unknown user'}</div>
-                                <div class="date">${m.updatedAt ? m.updatedAt.toLocaleString() : ''}</div>
+                                <div class="name">${s.name || 'Untitled'}</div>
+                                <div class="student-name">👤 ${s.studentName || 'Unknown'}</div>
+                                <div class="email">${s.userEmail || ''}</div>
+                                <div class="date">📅 ${s.submittedAt ? s.submittedAt.toLocaleString() : ''}</div>
+                                <div class="status ${s.status || 'pending'}">${(s.status || 'pending').toUpperCase()}</div>
                             </div>
                         </div>
                     `).join('');
                     
-                    // Click to load mindmap
+                    // Click to load submission
                     adminMindmapList.querySelectorAll('.admin-mindmap-item').forEach(item => {
                         item.addEventListener('click', async () => {
                             const id = item.dataset.id;
                             try {
-                                const mindmap = await FirebaseService.loadMindmap(id);
-                                this.loadMindmapData(mindmap.data);
+                                const submission = await FirebaseService.loadSubmission(id);
+                                this.loadMindmapData(submission.data);
                                 adminPanel.style.display = 'none';
                             } catch (error) {
                                 console.error('Load error:', error);
-                                alert('Failed to load mindmap');
+                                alert('Failed to load submission');
                             }
                         });
                     });

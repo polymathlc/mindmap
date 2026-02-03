@@ -224,6 +224,66 @@ const FirebaseService = {
         }));
     },
 
+    // Submit mindmap to teacher (separate collection)
+    async submitMindmap(name, studentName, data) {
+        if (!db) {
+            throw new Error('Firebase not initialized');
+        }
+        const user = this.getCurrentUser();
+        if (!user) {
+            throw new Error('User not authenticated');
+        }
+
+        const submissionData = {
+            name: name,
+            studentName: studentName,
+            data: JSON.stringify(data),
+            userId: user.uid,
+            userEmail: user.email,
+            submittedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            status: 'pending' // pending, reviewed, graded
+        };
+
+        const docRef = await db.collection('submissions').add(submissionData);
+        return docRef.id;
+    },
+
+    // Admin: Load all submissions (for marking)
+    async loadAllSubmissions() {
+        if (!db) {
+            throw new Error('Firebase not initialized');
+        }
+        if (!this.isAdmin()) {
+            throw new Error('Admin access required');
+        }
+
+        const snapshot = await db.collection('submissions')
+            .orderBy('submittedAt', 'desc')
+            .get();
+
+        return snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            submittedAt: doc.data().submittedAt?.toDate() || new Date()
+        }));
+    },
+
+    // Admin: Load specific submission
+    async loadSubmission(id) {
+        if (!db) {
+            throw new Error('Firebase not initialized');
+        }
+        const doc = await db.collection('submissions').doc(id).get();
+        if (!doc.exists) {
+            throw new Error('Submission not found');
+        }
+        return {
+            id: doc.id,
+            ...doc.data(),
+            data: JSON.parse(doc.data().data)
+        };
+    },
+
     // Upload image to Storage
     async uploadImage(file, filename) {
         if (!storage) {
