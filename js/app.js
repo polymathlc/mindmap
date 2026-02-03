@@ -1787,11 +1787,6 @@ class MindmapApp {
         this.updatePropertyPanel();
     }
 
-    // History Operations
-    saveState() {
-        // Remove any future states
-        this.history = this.history.slice(0, this.historyIndex + 1);
-
     // Load image with fallback - try primary source, then fallback URL
     loadImageWithFallback(primarySrc, fallbackUrl) {
         return new Promise((resolve, reject) => {
@@ -1825,7 +1820,11 @@ class MindmapApp {
         });
     }
 
+    // History Operations
     saveState() {
+        // Remove any future states
+        this.history = this.history.slice(0, this.historyIndex + 1);
+
         // Save current state (elements and connections)
         const state = {
             elements: this.elements.map(el => ({
