@@ -203,13 +203,14 @@ class MindmapApp {
                 y2: el.y2
             }));
         } else {
-            // Clicked on empty canvas - deselect all
+            // Clicked on empty canvas - start panning
             if (!e.ctrlKey && !e.metaKey) {
                 this.selectedElements = [];
             }
-            // Start selection box
-            this.isDrawing = true;
-            this.drawStart = pos;
+            // Start panning on blank canvas
+            this.isPanning = true;
+            this.panStart = { x: e.clientX, y: e.clientY };
+            this.canvas.style.cursor = 'grabbing';
         }
 
         this.updatePropertyPanel();
@@ -729,14 +730,73 @@ class MindmapApp {
         const items = e.clipboardData?.items;
         if (!items) return;
 
+        // Check if we have a selected shape to paste into
+        const selectedShape = this.selectedElements.length === 1 ? this.selectedElements[0] : null;
+        const isShape = selectedShape && ['rect', 'circle', 'diamond', 'triangle'].includes(selectedShape.type);
+
         for (let item of items) {
+            // Handle image paste
             if (item.type.startsWith('image/')) {
                 e.preventDefault();
                 const file = item.getAsFile();
-                this.addImageFromFile(file);
+                
+                if (isShape) {
+                    // Paste image into selected shape
+                    this.addImageToShape(selectedShape, file);
+                } else {
+                    this.addImageFromFile(file);
+                }
+                return;
+            }
+            
+            // Handle text paste into shape
+            if (item.type === 'text/plain' && isShape) {
+                e.preventDefault();
+                item.getAsString((text) => {
+                    if (selectedShape.text) {
+                        selectedShape.text += '\n' + text;
+                    } else {
+                        selectedShape.text = text;
+                    }
+                    this.saveState();
+                    this.render();
+                    this.updatePropertyPanel();
+                });
                 return;
             }
         }
+    }
+
+    // Add image to a shape
+    addImageToShape(shape, file) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const img = new Image();
+            img.onload = () => {
+                // Store image in shape
+                shape.embeddedImage = {
+                    data: event.target.result,
+                    image: img,
+                    originalWidth: img.width,
+                    originalHeight: img.height,
+                    position: 'bottom' // 'left', 'right', 'bottom', 'top'
+                };
+                
+                // Auto-resize shape to fit image if needed
+                const padding = 20;
+                const minWidth = Math.max(shape.width, img.width * 0.5 + padding * 2);
+                const minHeight = Math.max(shape.height, img.height * 0.3 + padding * 2 + 40); // +40 for text
+                
+                if (minWidth > shape.width) shape.width = minWidth;
+                if (minHeight > shape.height) shape.height = minHeight;
+                
+                this.saveState();
+                this.render();
+                this.updatePropertyPanel();
+            };
+            img.src = event.target.result;
+        };
+        reader.readAsDataURL(file);
     }
 
     // Drop Handler
@@ -1193,33 +1253,130 @@ class MindmapApp {
     }
 
     drawElementText(element) {
-        if (!element.text) return;
-
         const width = element.width || 0;
         const height = element.height || 0;
         const baseFontSize = element.fontSize || 14;
 
         // Calculate padding based on shape type
-        // Diamonds and triangles need more padding due to their shape
         let padding = 10;
         if (element.type === 'diamond') {
             padding = Math.min(width, height) * 0.25;
         } else if (element.type === 'triangle') {
             padding = Math.min(width, height) * 0.2;
         } else if (element.type === 'circle') {
-            // For circles/ellipses, use more padding on sides
             padding = Math.min(width, height) * 0.15;
         }
 
+        // Handle embedded image
+        if (element.embeddedImage && element.embeddedImage.image) {
+            this.drawEmbeddedImage(element, padding);
+        }
+
+        // Draw text if present
+        if (!element.text) return;
+
         // Calculate optimal font size with text wrapping
         const { fontSize: optimalFontSize, lines } = this.calculateOptimalFontSize(
-            element.text, width, height, baseFontSize, this.ctx, padding
+            element.text, width, height, baseFontSize, this.ctx, padding, element.embeddedImage
         );
 
-        // Render crisp text at center of element
-        const centerX = element.x + width / 2;
-        const centerY = element.y + height / 2;
+        // Adjust text position based on image position
+        let centerX = element.x + width / 2;
+        let centerY = element.y + height / 2;
+        
+        if (element.embeddedImage) {
+            const imgPos = element.embeddedImage.position || 'bottom';
+            const imgHeight = this.getEmbeddedImageDimensions(element, padding).height;
+            
+            if (imgPos === 'bottom') {
+                centerY = element.y + (height - imgHeight - padding) / 2 + padding / 2;
+            } else if (imgPos === 'top') {
+                centerY = element.y + height - (height - imgHeight - padding) / 2 - padding / 2;
+            } else if (imgPos === 'left' || imgPos === 'right') {
+                // Text takes half the width
+                const imgWidth = this.getEmbeddedImageDimensions(element, padding).width;
+                if (imgPos === 'left') {
+                    centerX = element.x + imgWidth + (width - imgWidth) / 2;
+                } else {
+                    centerX = element.x + (width - imgWidth) / 2;
+                }
+            }
+        }
+
         this.renderCrispText(lines, centerX, centerY, optimalFontSize, height, padding);
+    }
+
+    // Get embedded image dimensions scaled to fit shape
+    getEmbeddedImageDimensions(element, padding) {
+        const img = element.embeddedImage;
+        if (!img || !img.image) return { width: 0, height: 0 };
+
+        const pos = img.position || 'bottom';
+        const availableWidth = element.width - padding * 2;
+        const availableHeight = element.height - padding * 2;
+        
+        let maxWidth, maxHeight;
+        
+        if (pos === 'left' || pos === 'right') {
+            maxWidth = availableWidth * 0.4;
+            maxHeight = availableHeight * 0.8;
+        } else {
+            maxWidth = availableWidth * 0.8;
+            maxHeight = availableHeight * 0.5;
+        }
+
+        const ratio = Math.min(maxWidth / img.originalWidth, maxHeight / img.originalHeight, 1);
+        return {
+            width: img.originalWidth * ratio,
+            height: img.originalHeight * ratio
+        };
+    }
+
+    // Draw embedded image inside shape
+    drawEmbeddedImage(element, padding) {
+        const img = element.embeddedImage;
+        if (!img || !img.image) return;
+
+        const dims = this.getEmbeddedImageDimensions(element, padding);
+        const pos = img.position || 'bottom';
+        
+        let imgX, imgY;
+        
+        if (pos === 'bottom') {
+            imgX = element.x + (element.width - dims.width) / 2;
+            imgY = element.y + element.height - dims.height - padding;
+        } else if (pos === 'top') {
+            imgX = element.x + (element.width - dims.width) / 2;
+            imgY = element.y + padding;
+        } else if (pos === 'left') {
+            imgX = element.x + padding;
+            imgY = element.y + (element.height - dims.height) / 2;
+        } else if (pos === 'right') {
+            imgX = element.x + element.width - dims.width - padding;
+            imgY = element.y + (element.height - dims.height) / 2;
+        }
+
+        // Clip to shape bounds
+        this.ctx.save();
+        this.ctx.beginPath();
+        if (element.type === 'rect') {
+            const radius = Math.min(8, element.width / 4, element.height / 4);
+            this.ctx.roundRect(element.x, element.y, element.width, element.height, radius);
+        } else if (element.type === 'circle') {
+            this.ctx.ellipse(
+                element.x + element.width / 2,
+                element.y + element.height / 2,
+                element.width / 2,
+                element.height / 2,
+                0, 0, Math.PI * 2
+            );
+        } else {
+            this.ctx.rect(element.x, element.y, element.width, element.height);
+        }
+        this.ctx.clip();
+        
+        this.ctx.drawImage(img.image, imgX, imgY, dims.width, dims.height);
+        this.ctx.restore();
     }
 
     drawSelectionIndicator(element) {
@@ -1453,8 +1610,11 @@ class MindmapApp {
         const element = this.getElementAtPosition(pos);
         if (element && this.currentTool === 'select') {
             this.canvas.style.cursor = 'move';
+        } else if (this.currentTool === 'select') {
+            // Hand cursor on blank canvas for panning
+            this.canvas.style.cursor = 'grab';
         } else {
-            this.canvas.style.cursor = this.currentTool === 'select' ? 'default' : 'crosshair';
+            this.canvas.style.cursor = 'crosshair';
         }
     }
 
@@ -2039,11 +2199,41 @@ class MindmapApp {
         deleteBtn.addEventListener('click', () => {
             this.deleteSelected();
         });
+
+        // Image position buttons
+        ['Left', 'Top', 'Bottom', 'Right'].forEach(pos => {
+            const btn = document.getElementById(`imgPos${pos}`);
+            if (btn) {
+                btn.addEventListener('click', () => {
+                    if (this.selectedElements.length === 1 && this.selectedElements[0].embeddedImage) {
+                        this.selectedElements[0].embeddedImage.position = pos.toLowerCase();
+                        document.querySelectorAll('.pos-btn').forEach(b => b.classList.remove('active'));
+                        btn.classList.add('active');
+                        this.saveState();
+                        this.render();
+                    }
+                });
+            }
+        });
+
+        // Remove image button
+        const removeImageBtn = document.getElementById('removeImage');
+        if (removeImageBtn) {
+            removeImageBtn.addEventListener('click', () => {
+                if (this.selectedElements.length === 1 && this.selectedElements[0].embeddedImage) {
+                    delete this.selectedElements[0].embeddedImage;
+                    this.saveState();
+                    this.render();
+                    this.updatePropertyPanel();
+                }
+            });
+        }
     }
 
     updatePropertyPanel() {
         const noSelection = document.getElementById('noSelection');
         const elementProperties = document.getElementById('elementProperties');
+        const imagePositionGroup = document.getElementById('imagePositionGroup');
 
         if (this.selectedElements.length === 0) {
             noSelection.style.display = 'block';
@@ -2061,6 +2251,17 @@ class MindmapApp {
         document.getElementById('elementStroke').value = element.strokeColor || '#5DADE2';
         document.getElementById('elementStrokeWidth').value = element.strokeWidth || 2;
         document.getElementById('elementFontSize').value = element.fontSize || 14;
+
+        // Show/hide image position controls
+        if (element.embeddedImage && imagePositionGroup) {
+            imagePositionGroup.style.display = 'block';
+            const pos = element.embeddedImage.position || 'bottom';
+            document.querySelectorAll('.pos-btn').forEach(btn => btn.classList.remove('active'));
+            const posBtn = document.getElementById(`imgPos${pos.charAt(0).toUpperCase() + pos.slice(1)}`);
+            if (posBtn) posBtn.classList.add('active');
+        } else if (imagePositionGroup) {
+            imagePositionGroup.style.display = 'none';
+        }
     }
 
     // Modal Setup

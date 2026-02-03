@@ -123,6 +123,16 @@
                     <label>Font Size:</label>
                     <input type="number" id="elementFontSize" min="8" max="72" value="14">
                 </div>
+                <div class="property-group" id="imagePositionGroup" style="display: none;">
+                    <label>Image Position:</label>
+                    <div class="image-position-btns">
+                        <button id="imgPosLeft" class="pos-btn" title="Left of text">⬅️</button>
+                        <button id="imgPosTop" class="pos-btn" title="Above text">⬆️</button>
+                        <button id="imgPosBottom" class="pos-btn active" title="Below text">⬇️</button>
+                        <button id="imgPosRight" class="pos-btn" title="Right of text">➡️</button>
+                    </div>
+                    <button id="removeImage" class="action-btn" style="margin-top: 8px; width: 100%;">🗑️ Remove Image</button>
+                </div>
                 <button id="deleteElement" class="action-btn danger">Delete Element</button>
             </div>
         </div>
