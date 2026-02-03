@@ -1792,6 +1792,40 @@ class MindmapApp {
         // Remove any future states
         this.history = this.history.slice(0, this.historyIndex + 1);
 
+    // Load image with fallback - try primary source, then fallback URL
+    loadImageWithFallback(primarySrc, fallbackUrl) {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            
+            const tryLoad = (src) => {
+                if (!src) {
+                    reject(new Error('No image source'));
+                    return;
+                }
+                
+                img.onload = () => resolve(img);
+                img.onerror = () => {
+                    // If primary failed and we have a fallback, try it
+                    if (src === primarySrc && fallbackUrl && fallbackUrl !== primarySrc) {
+                        console.log('Primary image failed, trying fallback URL');
+                        tryLoad(fallbackUrl);
+                    } else {
+                        reject(new Error('Failed to load image'));
+                    }
+                };
+                
+                // Only set crossOrigin for http URLs
+                if (src.startsWith('http')) {
+                    img.crossOrigin = 'anonymous';
+                }
+                img.src = src;
+            };
+            
+            tryLoad(primarySrc);
+        });
+    }
+
+    saveState() {
         // Save current state (elements and connections)
         const state = {
             elements: this.elements.map(el => ({
@@ -2432,25 +2466,60 @@ class MindmapApp {
         }
 
         try {
-            // Process elements - keep base64 data for reliable loading
-            const processedElements = this.elements.map(el => {
+            // Process elements - upload images to Storage and keep base64 as backup
+            const processedElements = await Promise.all(this.elements.map(async (el, index) => {
                 const processed = { ...el, image: undefined };
                 
-                // Keep embedded image data (base64) for reliable loading
-                if (el.embeddedImage) {
+                // Handle embedded images
+                if (el.embeddedImage && el.embeddedImage.data) {
+                    try {
+                        const filename = `embedded_${index}_${Date.now()}.png`;
+                        const imageUrl = await FirebaseService.uploadImage(
+                            this.dataURLtoBlob(el.embeddedImage.data),
+                            filename
+                        );
+                        processed.embeddedImage = {
+                            position: el.embeddedImage.position,
+                            scale: el.embeddedImage.scale,
+                            originalWidth: el.embeddedImage.originalWidth,
+                            originalHeight: el.embeddedImage.originalHeight,
+                            url: imageUrl,
+                            data: el.embeddedImage.data, // Keep base64 as backup
+                            image: undefined
+                        };
+                    } catch (uploadErr) {
+                        console.warn('Failed to upload embedded image:', uploadErr);
+                        // Keep base64 data only
+                        processed.embeddedImage = {
+                            ...el.embeddedImage,
+                            image: undefined
+                        };
+                    }
+                } else if (el.embeddedImage) {
                     processed.embeddedImage = {
                         ...el.embeddedImage,
-                        image: undefined // Don't serialize Image object
+                        image: undefined
                     };
                 }
                 
-                // Keep standalone image data
-                if (el.type === 'image') {
-                    processed.image = undefined; // Don't serialize Image object
+                // Handle standalone images
+                if (el.type === 'image' && el.imageData) {
+                    try {
+                        const filename = `image_${index}_${Date.now()}.png`;
+                        const imageUrl = await FirebaseService.uploadImage(
+                            this.dataURLtoBlob(el.imageData),
+                            filename
+                        );
+                        processed.imageUrl = imageUrl;
+                        // Keep imageData as backup
+                    } catch (uploadErr) {
+                        console.warn('Failed to upload image:', uploadErr);
+                    }
+                    processed.image = undefined;
                 }
                 
                 return processed;
-            });
+            }));
 
             const data = {
                 elements: processedElements,
@@ -2688,20 +2757,13 @@ class MindmapApp {
                 const imgSrc = el.imageData || el.imageUrl;
                 if (imgSrc) {
                     pendingImages++;
-                    const img = new Image();
-                    // Only set crossOrigin for URLs (not base64)
-                    if (imgSrc.startsWith('http')) {
-                        img.crossOrigin = 'anonymous';
-                    }
-                    img.onload = () => {
+                    this.loadImageWithFallback(imgSrc, el.imageUrl).then(img => {
                         el.image = img;
                         checkRender();
-                    };
-                    img.onerror = () => {
-                        console.warn('Failed to load image:', imgSrc.substring(0, 100));
+                    }).catch(err => {
+                        console.warn('Failed to load image:', err);
                         checkRender();
-                    };
-                    img.src = imgSrc;
+                    });
                 }
             }
             
@@ -2710,20 +2772,13 @@ class MindmapApp {
                 const imgSrc = el.embeddedImage.data || el.embeddedImage.url;
                 if (imgSrc) {
                     pendingImages++;
-                    const img = new Image();
-                    // Only set crossOrigin for URLs (not base64)
-                    if (imgSrc.startsWith('http')) {
-                        img.crossOrigin = 'anonymous';
-                    }
-                    img.onload = () => {
+                    this.loadImageWithFallback(imgSrc, el.embeddedImage.url).then(img => {
                         el.embeddedImage.image = img;
                         checkRender();
-                    };
-                    img.onerror = () => {
-                        console.warn('Failed to load embedded image:', imgSrc.substring(0, 100));
+                    }).catch(err => {
+                        console.warn('Failed to load embedded image:', err);
                         checkRender();
-                    };
-                    img.src = imgSrc;
+                    });
                 }
             }
             
