@@ -95,14 +95,27 @@ class MindmapApp {
     }
 
     setupCanvas() {
+        this.dpr = window.devicePixelRatio || 1;
         this.resizeCanvas();
         window.addEventListener('resize', () => this.resizeCanvas());
     }
 
     resizeCanvas() {
         const container = document.getElementById('canvasContainer');
-        this.canvas.width = container.clientWidth;
-        this.canvas.height = container.clientHeight;
+        const rect = container.getBoundingClientRect();
+        
+        // Set display size
+        this.canvas.style.width = rect.width + 'px';
+        this.canvas.style.height = rect.height + 'px';
+        
+        // Set actual size in memory (scaled for retina)
+        this.canvas.width = rect.width * this.dpr;
+        this.canvas.height = rect.height * this.dpr;
+        
+        // Store logical dimensions
+        this.canvasWidth = rect.width;
+        this.canvasHeight = rect.height;
+        
         this.render();
     }
 
@@ -956,8 +969,11 @@ class MindmapApp {
     render() {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-        // Apply pan and zoom
+        // Apply devicePixelRatio scaling for retina displays
         this.ctx.save();
+        this.ctx.scale(this.dpr, this.dpr);
+        
+        // Apply pan and zoom
         this.ctx.translate(this.panOffset.x, this.panOffset.y);
         this.ctx.scale(this.zoom, this.zoom);
 
@@ -1185,11 +1201,14 @@ class MindmapApp {
     renderCrispText(lines, centerX, centerY, fontSize, maxHeight, padding = 10) {
         if (lines.length === 0) return;
 
-        // Calculate screen-space coordinates
-        const screenX = centerX * this.zoom + this.panOffset.x;
-        const screenY = centerY * this.zoom + this.panOffset.y;
-        const screenFontSize = fontSize * this.zoom;
-        const lineHeight = fontSize * 1.3 * this.zoom;
+        // Get current DPR (default to 1 for export context)
+        const dpr = this.dpr || 1;
+        
+        // Calculate screen-space coordinates with DPR
+        const screenX = (centerX * this.zoom + this.panOffset.x) * dpr;
+        const screenY = (centerY * this.zoom + this.panOffset.y) * dpr;
+        const screenFontSize = fontSize * this.zoom * dpr;
+        const lineHeight = fontSize * 1.3 * this.zoom * dpr;
 
         // Save current state and reset transform for crisp text rendering
         this.ctx.save();
@@ -1197,7 +1216,7 @@ class MindmapApp {
 
         // Set text properties with scaled font size
         this.ctx.fillStyle = '#333333';
-        this.ctx.font = `${screenFontSize}px -apple-system, BlinkMacSystemFont, sans-serif`;
+        this.ctx.font = `600 ${screenFontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
         this.ctx.textAlign = 'center';
         this.ctx.textBaseline = 'middle';
 
@@ -2467,8 +2486,9 @@ class MindmapApp {
         }
 
         const padding = 50;
-        const width = maxX - minX + padding * 2;
-        const height = maxY - minY + padding * 2;
+        const exportScale = 2; // Export at 2x for crisp images
+        const width = (maxX - minX + padding * 2) * exportScale;
+        const height = (maxY - minY + padding * 2) * exportScale;
 
         tempCanvas.width = width;
         tempCanvas.height = height;
@@ -2477,22 +2497,39 @@ class MindmapApp {
         tempCtx.fillStyle = '#ffffff';
         tempCtx.fillRect(0, 0, width, height);
 
+        // Scale for high-res export
+        tempCtx.scale(exportScale, exportScale);
+        
         // Translate to fit content
         tempCtx.translate(-minX + padding, -minY + padding);
 
-        // Draw connections
+        // Save original state
         const originalCtx = this.ctx;
+        const originalDpr = this.dpr;
+        const originalPanOffset = { ...this.panOffset };
+        const originalZoom = this.zoom;
+        
+        // Set export context (no pan/zoom, dpr=1 since we're scaling manually)
         this.ctx = tempCtx;
+        this.dpr = 1;
+        this.panOffset = { x: 0, y: 0 };
+        this.zoom = 1;
 
+        // Draw connections
         this.connections.forEach(connection => {
             if (this.elements.includes(connection.from) && this.elements.includes(connection.to)) {
                 this.drawConnection(connection);
             }
         });
 
-        // Draw elements
+        // Draw elements (without selection indicators)
         this.elements.forEach(el => this.drawElement(el));
+        
+        // Restore original state
         this.ctx = originalCtx;
+        this.dpr = originalDpr;
+        this.panOffset = originalPanOffset;
+        this.zoom = originalZoom;
 
         // Download
         const link = document.createElement('a');
