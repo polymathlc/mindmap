@@ -2532,8 +2532,23 @@ class MindmapApp {
 
             document.getElementById('saveModal').style.display = 'none';
             this.showLoading('Saving...');
-            
-            await FirebaseService.saveMindmap(name, data);
+
+            // Generate and upload thumbnail
+            let thumbnailUrl = null;
+            try {
+                const thumbnailData = this.generateThumbnail();
+                if (thumbnailData) {
+                    const thumbnailFilename = `thumb_${Date.now()}.png`;
+                    thumbnailUrl = await FirebaseService.uploadImage(
+                        this.dataURLtoBlob(thumbnailData),
+                        thumbnailFilename
+                    );
+                }
+            } catch (thumbErr) {
+                console.warn('Failed to generate/upload thumbnail:', thumbErr);
+            }
+
+            await FirebaseService.saveMindmap(name, data, thumbnailUrl);
             this.hideLoading();
             alert('✅ Draft saved successfully!');
         } catch (error) {
@@ -2659,6 +2674,82 @@ class MindmapApp {
         return new Blob([u8arr], { type: mime });
     }
 
+    // Generate thumbnail preview of the mindmap
+    generateThumbnail() {
+        if (this.elements.length === 0) {
+            return null;
+        }
+
+        // Calculate bounds of all elements
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+        this.elements.forEach(el => {
+            const bounds = this.getElementBounds(el);
+            minX = Math.min(minX, bounds.x);
+            minY = Math.min(minY, bounds.y);
+            maxX = Math.max(maxX, bounds.x + bounds.width);
+            maxY = Math.max(maxY, bounds.y + bounds.height);
+        });
+
+        const padding = 20;
+        const contentWidth = maxX - minX + padding * 2;
+        const contentHeight = maxY - minY + padding * 2;
+
+        // Create thumbnail canvas (max 200x150)
+        const maxThumbWidth = 200;
+        const maxThumbHeight = 150;
+        const scale = Math.min(maxThumbWidth / contentWidth, maxThumbHeight / contentHeight, 1);
+
+        const thumbCanvas = document.createElement('canvas');
+        const thumbCtx = thumbCanvas.getContext('2d');
+
+        thumbCanvas.width = Math.ceil(contentWidth * scale);
+        thumbCanvas.height = Math.ceil(contentHeight * scale);
+
+        // White background
+        thumbCtx.fillStyle = '#ffffff';
+        thumbCtx.fillRect(0, 0, thumbCanvas.width, thumbCanvas.height);
+
+        // Scale and translate
+        thumbCtx.scale(scale, scale);
+        thumbCtx.translate(-minX + padding, -minY + padding);
+
+        // Save original state
+        const originalCtx = this.ctx;
+        const originalDpr = this.dpr;
+        const originalPanOffset = { ...this.panOffset };
+        const originalZoom = this.zoom;
+        const originalSelected = [...this.selectedElements];
+
+        // Clear selection for clean thumbnail
+        this.selectedElements = [];
+
+        // Set thumbnail context
+        this.ctx = thumbCtx;
+        this.dpr = 1;
+        this.panOffset = { x: 0, y: 0 };
+        this.zoom = 1;
+
+        // Draw connections first
+        this.connections.forEach(connection => {
+            if (this.elements.includes(connection.from) && this.elements.includes(connection.to)) {
+                this.drawConnection(connection);
+            }
+        });
+
+        // Draw all elements
+        this.elements.forEach(el => this.drawElement(el));
+
+        // Restore original state
+        this.ctx = originalCtx;
+        this.dpr = originalDpr;
+        this.panOffset = originalPanOffset;
+        this.zoom = originalZoom;
+        this.selectedElements = originalSelected;
+
+        return thumbCanvas.toDataURL('image/png', 0.7);
+    }
+
     showLoadModal() {
         if (!FirebaseService.isConfigured()) {
             alert('Firebase is not configured. Please update js/firebase-config.js with your Firebase credentials.');
@@ -2690,16 +2781,26 @@ class MindmapApp {
             mindmaps.forEach(mindmap => {
                 const item = document.createElement('div');
                 item.className = 'mindmap-item';
+
+                // Check if thumbnail exists
+                const thumbnailHtml = mindmap.thumbnail
+                    ? `<img src="${mindmap.thumbnail}" alt="Preview" class="mindmap-thumbnail" onerror="this.style.display='none'">`
+                    : `<div class="mindmap-thumbnail-placeholder">No Preview</div>`;
+
                 item.innerHTML = `
-                    <div>
+                    ${thumbnailHtml}
+                    <div class="mindmap-info">
                         <div class="name">${mindmap.name}</div>
                         <div class="date">${mindmap.updatedAt.toLocaleDateString()}</div>
                     </div>
                     <button class="delete-btn" title="Delete">X</button>
                 `;
 
-                item.querySelector('.name').addEventListener('click', () => {
-                    this.loadMindmap(mindmap.id);
+                // Make the entire item clickable (except delete button)
+                item.addEventListener('click', (e) => {
+                    if (!e.target.classList.contains('delete-btn')) {
+                        this.loadMindmap(mindmap.id);
+                    }
                 });
 
                 item.querySelector('.delete-btn').addEventListener('click', async (e) => {
@@ -2720,10 +2821,13 @@ class MindmapApp {
 
     async loadMindmap(id) {
         try {
+            document.getElementById('loadModal').style.display = 'none';
+            this.showLoading('Loading mindmap...');
             const mindmap = await FirebaseService.loadMindmap(id);
             this.loadMindmapData(mindmap.data);
-            document.getElementById('loadModal').style.display = 'none';
+            this.hideLoading();
         } catch (error) {
+            this.hideLoading();
             console.error('Load error:', error);
             alert('Failed to load mindmap: ' + error.message);
         }
