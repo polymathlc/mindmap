@@ -55,6 +55,7 @@
             </div>
             <div class="toolbar-section user-section">
                 <span id="userStatus">Not signed in</span>
+                <button id="adminBtn" class="action-btn admin-btn" style="display: none;">📋 Submissions</button>
                 <button id="signInBtn" class="action-btn">Sign In</button>
             </div>
         </div>
@@ -148,6 +149,108 @@
                     <button id="confirmSave" class="action-btn">Save</button>
                     <button id="closeSaveModal" class="action-btn">Cancel</button>
                 </div>
+            </div>
+        </div>
+
+        <!-- Login Modal -->
+        <div id="loginModal" class="modal" style="display: none;">
+            <div class="modal-content">
+                <h3 id="loginModalTitle">Sign In</h3>
+                
+                <!-- Login Form -->
+                <div id="loginForm">
+                    <div class="property-group">
+                        <label>Email:</label>
+                        <input type="email" id="loginEmail" placeholder="your@email.com">
+                    </div>
+                    <div class="property-group">
+                        <label>Password:</label>
+                        <input type="password" id="loginPassword" placeholder="Password">
+                    </div>
+                    <div id="loginError" class="error-message" style="display: none;"></div>
+                    <div class="modal-actions">
+                        <button id="submitLogin" class="action-btn primary">Sign In</button>
+                    </div>
+                    <div class="auth-divider">
+                        <span>or</span>
+                    </div>
+                    <button id="googleSignIn" class="action-btn google-btn">
+                        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" width="18">
+                        Sign in with Google
+                    </button>
+                    <div class="auth-links">
+                        <a href="#" id="showRegister">Create an account</a>
+                        <a href="#" id="showForgotPassword">Forgot password?</a>
+                    </div>
+                </div>
+
+                <!-- Register Form -->
+                <div id="registerForm" style="display: none;">
+                    <div class="property-group">
+                        <label>Email:</label>
+                        <input type="email" id="registerEmail" placeholder="your@email.com">
+                    </div>
+                    <div class="property-group">
+                        <label>Password:</label>
+                        <input type="password" id="registerPassword" placeholder="Password (min 6 characters)">
+                    </div>
+                    <div class="property-group">
+                        <label>Confirm Password:</label>
+                        <input type="password" id="confirmPassword" placeholder="Confirm password">
+                    </div>
+                    <div id="registerError" class="error-message" style="display: none;"></div>
+                    <div class="modal-actions">
+                        <button id="submitRegister" class="action-btn primary">Create Account</button>
+                    </div>
+                    <div class="auth-links">
+                        <a href="#" id="showLogin">Already have an account? Sign in</a>
+                    </div>
+                </div>
+
+                <!-- Forgot Password Form -->
+                <div id="forgotPasswordForm" style="display: none;">
+                    <p>Enter your email to receive a password reset link.</p>
+                    <div class="property-group">
+                        <label>Email:</label>
+                        <input type="email" id="resetEmail" placeholder="your@email.com">
+                    </div>
+                    <div id="resetError" class="error-message" style="display: none;"></div>
+                    <div id="resetSuccess" class="success-message" style="display: none;"></div>
+                    <div class="modal-actions">
+                        <button id="submitReset" class="action-btn primary">Send Reset Link</button>
+                    </div>
+                    <div class="auth-links">
+                        <a href="#" id="showLoginFromReset">Back to sign in</a>
+                    </div>
+                </div>
+
+                <!-- Verification Pending -->
+                <div id="verificationPending" style="display: none;">
+                    <div class="verification-icon">📧</div>
+                    <h4>Verify Your Email</h4>
+                    <p>We've sent a verification email to <strong id="verificationEmail"></strong></p>
+                    <p>Please check your inbox and click the verification link.</p>
+                    <div class="modal-actions">
+                        <button id="resendVerification" class="action-btn">Resend Email</button>
+                        <button id="checkVerification" class="action-btn primary">I've Verified</button>
+                    </div>
+                    <div class="auth-links">
+                        <a href="#" id="backToLogin">Back to sign in</a>
+                    </div>
+                </div>
+
+                <button id="closeLoginModal" class="close-modal-btn">&times;</button>
+            </div>
+        </div>
+
+        <!-- Admin Panel (for viewing all student mindmaps) -->
+        <div id="adminPanel" style="display: none;">
+            <div class="admin-header">
+                <h3>📋 Student Submissions</h3>
+                <button id="closeAdminPanel" class="action-btn">Close</button>
+            </div>
+            <div id="adminMindmapList">
+                <p>Loading submissions...</p>
             </div>
         </div>
     </div>

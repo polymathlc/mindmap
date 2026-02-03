@@ -456,3 +456,271 @@ body {
         display: none;
     }
 }
+
+/* Login Modal Styles */
+#loginModal .modal-content {
+    position: relative;
+    min-width: 360px;
+    max-width: 400px;
+}
+
+.close-modal-btn {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    background: none;
+    border: none;
+    font-size: 24px;
+    color: #888;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+}
+
+.close-modal-btn:hover {
+    color: #333;
+}
+
+.property-group input[type="email"],
+.property-group input[type="password"] {
+    width: 100%;
+    padding: 10px 12px;
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    color: #333;
+    font-size: 14px;
+}
+
+.property-group input[type="email"]:focus,
+.property-group input[type="password"]:focus {
+    outline: none;
+    border-color: #6c5ce7;
+    background: #fff;
+}
+
+.action-btn.primary {
+    background: linear-gradient(180deg, #6c5ce7 0%, #5849be 100%);
+    border-color: #5849be;
+    color: #fff;
+    width: 100%;
+}
+
+.action-btn.primary:hover {
+    background: linear-gradient(180deg, #7d6ef0 0%, #6c5ce7 100%);
+}
+
+.auth-divider {
+    display: flex;
+    align-items: center;
+    margin: 20px 0;
+    color: #888;
+    font-size: 12px;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: #dee2e6;
+}
+
+.auth-divider span {
+    padding: 0 15px;
+}
+
+.google-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    padding: 10px 16px;
+    background: #fff;
+    border: 1px solid #dee2e6;
+    font-size: 14px;
+}
+
+.google-btn:hover {
+    background: #f8f9fa;
+    border-color: #4285f4;
+}
+
+.google-btn img {
+    width: 18px;
+    height: 18px;
+}
+
+.auth-links {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 1px solid #e9ecef;
+}
+
+.auth-links a {
+    color: #6c5ce7;
+    font-size: 13px;
+    text-decoration: none;
+}
+
+.auth-links a:hover {
+    text-decoration: underline;
+}
+
+.error-message {
+    background: #ffe6e6;
+    color: #d63031;
+    padding: 10px 15px;
+    border-radius: 6px;
+    font-size: 13px;
+    margin-bottom: 15px;
+    border: 1px solid #ffcccc;
+}
+
+.success-message {
+    background: #e6ffe6;
+    color: #00b894;
+    padding: 10px 15px;
+    border-radius: 6px;
+    font-size: 13px;
+    margin-bottom: 15px;
+    border: 1px solid #ccffcc;
+}
+
+.verification-icon {
+    font-size: 48px;
+    text-align: center;
+    margin-bottom: 15px;
+}
+
+#verificationPending h4 {
+    text-align: center;
+    color: #333;
+    margin-bottom: 10px;
+}
+
+#verificationPending p {
+    text-align: center;
+    color: #666;
+    font-size: 14px;
+    margin-bottom: 10px;
+}
+
+/* Admin Panel Styles */
+#adminPanel {
+    position: fixed;
+    top: 70px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 90%;
+    max-width: 800px;
+    max-height: 70vh;
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 12px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+    z-index: 500;
+    overflow: hidden;
+}
+
+.admin-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 20px;
+    background: linear-gradient(180deg, #6c5ce7 0%, #5849be 100%);
+    color: #fff;
+}
+
+.admin-header h3 {
+    margin: 0;
+    font-size: 16px;
+}
+
+.admin-header .action-btn {
+    background: rgba(255,255,255,0.2);
+    border-color: rgba(255,255,255,0.3);
+    color: #fff;
+    padding: 6px 12px;
+    font-size: 12px;
+}
+
+.admin-header .action-btn:hover {
+    background: rgba(255,255,255,0.3);
+}
+
+#adminMindmapList {
+    padding: 15px 20px;
+    max-height: calc(70vh - 60px);
+    overflow-y: auto;
+}
+
+.admin-mindmap-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 15px;
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.admin-mindmap-item:hover {
+    background: rgba(108, 92, 231, 0.08);
+    border-color: #6c5ce7;
+}
+
+.admin-mindmap-item .info {
+    flex: 1;
+}
+
+.admin-mindmap-item .name {
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 4px;
+}
+
+.admin-mindmap-item .email {
+    font-size: 12px;
+    color: #6c5ce7;
+}
+
+.admin-mindmap-item .date {
+    font-size: 11px;
+    color: #888;
+}
+
+.admin-btn {
+    background: linear-gradient(180deg, #00b894 0%, #009975 100%) !important;
+    border-color: #009975 !important;
+    color: #fff !important;
+}
+
+.admin-btn:hover {
+    background: linear-gradient(180deg, #00d9a5 0%, #00b894 100%) !important;
+}
+
+/* Verified badge */
+.verified-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    color: #00b894;
+    margin-left: 8px;
+}
+
+.unverified-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    color: #fdcb6e;
+    margin-left: 8px;
+}

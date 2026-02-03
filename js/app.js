@@ -2304,29 +2304,340 @@ class MindmapApp {
     setupAuth() {
         const signInBtn = document.getElementById('signInBtn');
         const userStatus = document.getElementById('userStatus');
+        const adminBtn = document.getElementById('adminBtn');
+        const loginModal = document.getElementById('loginModal');
+        const closeLoginModal = document.getElementById('closeLoginModal');
+        
+        // Forms
+        const loginForm = document.getElementById('loginForm');
+        const registerForm = document.getElementById('registerForm');
+        const forgotPasswordForm = document.getElementById('forgotPasswordForm');
+        const verificationPending = document.getElementById('verificationPending');
+        
+        // Login form elements
+        const loginEmail = document.getElementById('loginEmail');
+        const loginPassword = document.getElementById('loginPassword');
+        const submitLogin = document.getElementById('submitLogin');
+        const googleSignIn = document.getElementById('googleSignIn');
+        const loginError = document.getElementById('loginError');
+        
+        // Register form elements
+        const registerEmail = document.getElementById('registerEmail');
+        const registerPassword = document.getElementById('registerPassword');
+        const confirmPassword = document.getElementById('confirmPassword');
+        const submitRegister = document.getElementById('submitRegister');
+        const registerError = document.getElementById('registerError');
+        
+        // Forgot password elements
+        const resetEmail = document.getElementById('resetEmail');
+        const submitReset = document.getElementById('submitReset');
+        const resetError = document.getElementById('resetError');
+        const resetSuccess = document.getElementById('resetSuccess');
+        
+        // Navigation links
+        const showRegister = document.getElementById('showRegister');
+        const showLogin = document.getElementById('showLogin');
+        const showForgotPassword = document.getElementById('showForgotPassword');
+        const showLoginFromReset = document.getElementById('showLoginFromReset');
+        const backToLogin = document.getElementById('backToLogin');
+        
+        // Verification elements
+        const verificationEmail = document.getElementById('verificationEmail');
+        const resendVerification = document.getElementById('resendVerification');
+        const checkVerification = document.getElementById('checkVerification');
+        
+        // Admin panel
+        const adminPanel = document.getElementById('adminPanel');
+        const closeAdminPanel = document.getElementById('closeAdminPanel');
+        const adminMindmapList = document.getElementById('adminMindmapList');
 
+        // Helper functions
+        const showForm = (form) => {
+            loginForm.style.display = 'none';
+            registerForm.style.display = 'none';
+            forgotPasswordForm.style.display = 'none';
+            verificationPending.style.display = 'none';
+            form.style.display = 'block';
+            
+            // Update title
+            const title = document.getElementById('loginModalTitle');
+            if (form === loginForm) title.textContent = 'Sign In';
+            else if (form === registerForm) title.textContent = 'Create Account';
+            else if (form === forgotPasswordForm) title.textContent = 'Reset Password';
+            else if (form === verificationPending) title.textContent = 'Verify Email';
+        };
+
+        const hideError = (el) => { el.style.display = 'none'; el.textContent = ''; };
+        const showError = (el, msg) => { el.style.display = 'block'; el.textContent = msg; };
+
+        // Sign in button - open modal or sign out
         signInBtn.addEventListener('click', async () => {
             if (FirebaseService.getCurrentUser()) {
                 await FirebaseService.signOut();
             } else {
-                try {
-                    await FirebaseService.signInWithGoogle();
-                } catch (error) {
-                    console.error('Sign in error:', error);
-                    if (error.code !== 'auth/popup-closed-by-user') {
-                        alert('Failed to sign in: ' + error.message);
-                    }
+                showForm(loginForm);
+                hideError(loginError);
+                loginModal.style.display = 'flex';
+            }
+        });
+
+        // Close modal
+        closeLoginModal.addEventListener('click', () => {
+            loginModal.style.display = 'none';
+        });
+
+        loginModal.addEventListener('click', (e) => {
+            if (e.target === loginModal) loginModal.style.display = 'none';
+        });
+
+        // Navigation between forms
+        showRegister.addEventListener('click', (e) => {
+            e.preventDefault();
+            showForm(registerForm);
+            hideError(registerError);
+        });
+
+        showLogin.addEventListener('click', (e) => {
+            e.preventDefault();
+            showForm(loginForm);
+            hideError(loginError);
+        });
+
+        showForgotPassword.addEventListener('click', (e) => {
+            e.preventDefault();
+            showForm(forgotPasswordForm);
+            hideError(resetError);
+            resetSuccess.style.display = 'none';
+        });
+
+        showLoginFromReset.addEventListener('click', (e) => {
+            e.preventDefault();
+            showForm(loginForm);
+            hideError(loginError);
+        });
+
+        backToLogin.addEventListener('click', (e) => {
+            e.preventDefault();
+            showForm(loginForm);
+            hideError(loginError);
+        });
+
+        // Email/Password Login
+        submitLogin.addEventListener('click', async () => {
+            hideError(loginError);
+            const email = loginEmail.value.trim();
+            const password = loginPassword.value;
+
+            if (!email || !password) {
+                showError(loginError, 'Please enter email and password');
+                return;
+            }
+
+            try {
+                submitLogin.disabled = true;
+                submitLogin.textContent = 'Signing in...';
+                const result = await FirebaseService.signInWithEmail(email, password);
+                
+                // Check if email is verified (skip for admin)
+                if (!result.user.emailVerified && result.user.email !== ADMIN_EMAIL) {
+                    verificationEmail.textContent = result.user.email;
+                    showForm(verificationPending);
+                } else {
+                    loginModal.style.display = 'none';
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                let message = 'Failed to sign in';
+                if (error.code === 'auth/user-not-found') message = 'No account found with this email';
+                else if (error.code === 'auth/wrong-password') message = 'Incorrect password';
+                else if (error.code === 'auth/invalid-email') message = 'Invalid email address';
+                else if (error.code === 'auth/too-many-requests') message = 'Too many attempts. Try again later.';
+                showError(loginError, message);
+            } finally {
+                submitLogin.disabled = false;
+                submitLogin.textContent = 'Sign In';
+            }
+        });
+
+        // Google Sign In
+        googleSignIn.addEventListener('click', async () => {
+            try {
+                await FirebaseService.signInWithGoogle();
+                loginModal.style.display = 'none';
+            } catch (error) {
+                console.error('Google sign in error:', error);
+                if (error.code !== 'auth/popup-closed-by-user') {
+                    showError(loginError, 'Failed to sign in with Google');
                 }
             }
         });
 
+        // Registration
+        submitRegister.addEventListener('click', async () => {
+            hideError(registerError);
+            const email = registerEmail.value.trim();
+            const password = registerPassword.value;
+            const confirm = confirmPassword.value;
+
+            if (!email || !password || !confirm) {
+                showError(registerError, 'Please fill in all fields');
+                return;
+            }
+
+            if (password.length < 6) {
+                showError(registerError, 'Password must be at least 6 characters');
+                return;
+            }
+
+            if (password !== confirm) {
+                showError(registerError, 'Passwords do not match');
+                return;
+            }
+
+            try {
+                submitRegister.disabled = true;
+                submitRegister.textContent = 'Creating account...';
+                const result = await FirebaseService.registerWithEmail(email, password);
+                verificationEmail.textContent = result.user.email;
+                showForm(verificationPending);
+            } catch (error) {
+                console.error('Registration error:', error);
+                let message = 'Failed to create account';
+                if (error.code === 'auth/email-already-in-use') message = 'Email already registered';
+                else if (error.code === 'auth/invalid-email') message = 'Invalid email address';
+                else if (error.code === 'auth/weak-password') message = 'Password is too weak';
+                showError(registerError, message);
+            } finally {
+                submitRegister.disabled = false;
+                submitRegister.textContent = 'Create Account';
+            }
+        });
+
+        // Password Reset
+        submitReset.addEventListener('click', async () => {
+            hideError(resetError);
+            resetSuccess.style.display = 'none';
+            const email = resetEmail.value.trim();
+
+            if (!email) {
+                showError(resetError, 'Please enter your email');
+                return;
+            }
+
+            try {
+                submitReset.disabled = true;
+                submitReset.textContent = 'Sending...';
+                await FirebaseService.sendPasswordResetEmail(email);
+                resetSuccess.style.display = 'block';
+                resetSuccess.textContent = 'Reset link sent! Check your email.';
+            } catch (error) {
+                console.error('Password reset error:', error);
+                let message = 'Failed to send reset email';
+                if (error.code === 'auth/user-not-found') message = 'No account found with this email';
+                else if (error.code === 'auth/invalid-email') message = 'Invalid email address';
+                showError(resetError, message);
+            } finally {
+                submitReset.disabled = false;
+                submitReset.textContent = 'Send Reset Link';
+            }
+        });
+
+        // Resend verification email
+        resendVerification.addEventListener('click', async () => {
+            try {
+                resendVerification.disabled = true;
+                resendVerification.textContent = 'Sending...';
+                await FirebaseService.sendVerificationEmail();
+                resendVerification.textContent = 'Email Sent!';
+                setTimeout(() => {
+                    resendVerification.disabled = false;
+                    resendVerification.textContent = 'Resend Email';
+                }, 3000);
+            } catch (error) {
+                console.error('Resend verification error:', error);
+                alert('Failed to resend verification email');
+                resendVerification.disabled = false;
+                resendVerification.textContent = 'Resend Email';
+            }
+        });
+
+        // Check verification
+        checkVerification.addEventListener('click', async () => {
+            const user = FirebaseService.getCurrentUser();
+            if (user) {
+                await user.reload();
+                if (user.emailVerified) {
+                    loginModal.style.display = 'none';
+                } else {
+                    alert('Email not yet verified. Please check your inbox and click the verification link.');
+                }
+            }
+        });
+
+        // Admin panel button
+        adminBtn.addEventListener('click', async () => {
+            adminPanel.style.display = 'block';
+            adminMindmapList.innerHTML = '<p>Loading submissions...</p>';
+            
+            try {
+                const mindmaps = await FirebaseService.loadAllMindmaps();
+                if (mindmaps.length === 0) {
+                    adminMindmapList.innerHTML = '<p>No submissions yet.</p>';
+                } else {
+                    adminMindmapList.innerHTML = mindmaps.map(m => `
+                        <div class="admin-mindmap-item" data-id="${m.id}">
+                            <div class="info">
+                                <div class="name">${m.name || 'Untitled'}</div>
+                                <div class="email">${m.userEmail || 'Unknown user'}</div>
+                                <div class="date">${m.updatedAt ? m.updatedAt.toLocaleString() : ''}</div>
+                            </div>
+                        </div>
+                    `).join('');
+                    
+                    // Click to load mindmap
+                    adminMindmapList.querySelectorAll('.admin-mindmap-item').forEach(item => {
+                        item.addEventListener('click', async () => {
+                            const id = item.dataset.id;
+                            try {
+                                const mindmap = await FirebaseService.loadMindmap(id);
+                                this.loadMindmapData(mindmap.data);
+                                adminPanel.style.display = 'none';
+                            } catch (error) {
+                                console.error('Load error:', error);
+                                alert('Failed to load mindmap');
+                            }
+                        });
+                    });
+                }
+            } catch (error) {
+                console.error('Admin load error:', error);
+                adminMindmapList.innerHTML = '<p>Failed to load submissions.</p>';
+            }
+        });
+
+        closeAdminPanel.addEventListener('click', () => {
+            adminPanel.style.display = 'none';
+        });
+
+        // Auth state changes
         FirebaseService.onAuthStateChanged((user) => {
             if (user) {
-                userStatus.textContent = user.email;
+                const verified = user.emailVerified || user.email === ADMIN_EMAIL;
+                userStatus.innerHTML = user.email + (verified ? 
+                    '<span class="verified-badge">✓</span>' : 
+                    '<span class="unverified-badge">⚠ Unverified</span>');
                 signInBtn.textContent = 'Sign Out';
+                
+                // Show admin button if admin
+                if (FirebaseService.isAdmin()) {
+                    adminBtn.style.display = 'inline-block';
+                } else {
+                    adminBtn.style.display = 'none';
+                }
             } else {
                 userStatus.textContent = 'Not signed in';
                 signInBtn.textContent = 'Sign In';
+                adminBtn.style.display = 'none';
             }
         });
     }

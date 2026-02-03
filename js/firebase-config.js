@@ -2,13 +2,17 @@
 // Replace with your Firebase project configuration from the science-cer app
 
 const firebaseConfig = {
-    apiKey: "YOUR_API_KEY",
-    authDomain: "science-cer.firebaseapp.com",
-    projectId: "science-cer",
-    storageBucket: "science-cer.appspot.com",
-    messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-    appId: "YOUR_APP_ID"
+    apiKey: "AIzaSyAUSI3Uh28IeqASEp0JhH4QPaVt-O3meBo",
+    authDomain: "mathgen--app.firebaseapp.com",
+    projectId: "mathgen--app",
+    storageBucket: "mathgen--app.firebasestorage.app",
+    messagingSenderId: "165654161198",
+    appId: "1:165654161198:web:16c8bd60eb3a2aa7edbcbf",
+    measurementId: "G-0MWZFG211D"
 };
+
+// Admin email for special privileges
+const ADMIN_EMAIL = "chungzhikai@gmail.com";
 
 // Initialize Firebase
 let app, auth, db, storage;
@@ -36,6 +40,12 @@ const FirebaseService = {
         return auth ? auth.currentUser : null;
     },
 
+    // Check if current user is admin
+    isAdmin() {
+        const user = this.getCurrentUser();
+        return user && user.email === ADMIN_EMAIL;
+    },
+
     // Sign in with Google
     async signInWithGoogle() {
         if (!auth) {
@@ -43,6 +53,42 @@ const FirebaseService = {
         }
         const provider = new firebase.auth.GoogleAuthProvider();
         return auth.signInWithPopup(provider);
+    },
+
+    // Sign in with email and password
+    async signInWithEmail(email, password) {
+        if (!auth) {
+            throw new Error('Firebase not initialized');
+        }
+        return auth.signInWithEmailAndPassword(email, password);
+    },
+
+    // Register with email and password
+    async registerWithEmail(email, password) {
+        if (!auth) {
+            throw new Error('Firebase not initialized');
+        }
+        const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+        // Send verification email
+        await userCredential.user.sendEmailVerification();
+        return userCredential;
+    },
+
+    // Send verification email
+    async sendVerificationEmail() {
+        const user = this.getCurrentUser();
+        if (!user) {
+            throw new Error('No user signed in');
+        }
+        return user.sendEmailVerification();
+    },
+
+    // Send password reset email
+    async sendPasswordResetEmail(email) {
+        if (!auth) {
+            throw new Error('Firebase not initialized');
+        }
+        return auth.sendPasswordResetEmail(email);
     },
 
     // Sign out
@@ -135,6 +181,47 @@ const FirebaseService = {
             throw new Error('Firebase not initialized');
         }
         await db.collection('mindmaps').doc(id).delete();
+    },
+
+    // Admin: Load all mindmaps from all users (for marking)
+    async loadAllMindmaps() {
+        if (!db) {
+            throw new Error('Firebase not initialized');
+        }
+        if (!this.isAdmin()) {
+            throw new Error('Admin access required');
+        }
+
+        const snapshot = await db.collection('mindmaps')
+            .orderBy('updatedAt', 'desc')
+            .get();
+
+        return snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            updatedAt: doc.data().updatedAt?.toDate() || new Date()
+        }));
+    },
+
+    // Admin: Load mindmaps by user email
+    async loadMindmapsByUser(userEmail) {
+        if (!db) {
+            throw new Error('Firebase not initialized');
+        }
+        if (!this.isAdmin()) {
+            throw new Error('Admin access required');
+        }
+
+        const snapshot = await db.collection('mindmaps')
+            .where('userEmail', '==', userEmail)
+            .orderBy('updatedAt', 'desc')
+            .get();
+
+        return snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            updatedAt: doc.data().updatedAt?.toDate() || new Date()
+        }));
     },
 
     // Upload image to Storage
