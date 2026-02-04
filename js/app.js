@@ -11,6 +11,7 @@ class MindmapApp {
         this.connections = []; // Store connections between shapes
         this.selectedElements = [];
         this.currentMindmapName = null; // Track currently loaded mindmap name
+        this.currentStudentName = null; // Track student name for submissions
         this.currentTool = 'select';
         this.isDrawing = false;
         this.isDragging = false;
@@ -2410,7 +2411,20 @@ class MindmapApp {
 
     // Modal Setup
     setupModals() {
-        // Save Modal
+        // Save Options Modal (new combined save/submit modal)
+        document.getElementById('closeSaveOptionsModal').addEventListener('click', () => {
+            document.getElementById('saveOptionsModal').style.display = 'none';
+        });
+
+        document.getElementById('saveOnlyBtn').addEventListener('click', () => {
+            this.saveOnly();
+        });
+
+        document.getElementById('saveAndSubmitBtn').addEventListener('click', () => {
+            this.saveAndSubmit();
+        });
+
+        // Old Save Modal (kept for backward compatibility)
         document.getElementById('closeSaveModal').addEventListener('click', () => {
             document.getElementById('saveModal').style.display = 'none';
         });
@@ -2454,13 +2468,26 @@ class MindmapApp {
             return;
         }
 
+        if (this.elements.length === 0) {
+            alert('Please create a mindmap before saving.');
+            return;
+        }
+
+        // Show the new save options modal
+        const nameInput = document.getElementById('saveOptionsName');
+        const studentNameInput = document.getElementById('saveOptionsStudentName');
+
         // Pre-fill with current mindmap name if loaded from a saved map
-        const nameInput = document.getElementById('mindmapName');
         if (this.currentMindmapName) {
             nameInput.value = this.currentMindmapName;
         }
 
-        document.getElementById('saveModal').style.display = 'flex';
+        // Pre-fill student name if saved
+        if (this.currentStudentName) {
+            studentNameInput.value = this.currentStudentName;
+        }
+
+        document.getElementById('saveOptionsModal').style.display = 'flex';
         nameInput.focus();
     }
 
@@ -2581,7 +2608,176 @@ class MindmapApp {
         }
     }
 
-    // Submit Modal
+    // Save Only - just save as draft
+    async saveOnly() {
+        const name = document.getElementById('saveOptionsName').value.trim();
+        if (!name) {
+            alert('Please enter a name for your mindmap.');
+            return;
+        }
+
+        document.getElementById('saveOptionsModal').style.display = 'none';
+        this.showLoading('Saving...');
+
+        try {
+            // Process elements and get save data
+            const { data, thumbnailUrl } = await this.processElementsForSave();
+
+            await FirebaseService.saveMindmap(name, data, thumbnailUrl);
+            // Store the name for subsequent saves
+            this.currentMindmapName = name;
+            // Store student name
+            const studentName = document.getElementById('saveOptionsStudentName').value.trim();
+            if (studentName) {
+                this.currentStudentName = studentName;
+            }
+            this.hideLoading();
+            alert('Saved successfully!');
+        } catch (error) {
+            this.hideLoading();
+            console.error('Save error:', error);
+            alert('Failed to save mindmap: ' + error.message);
+        }
+    }
+
+    // Save and Submit - save as draft then submit with exact same data
+    async saveAndSubmit() {
+        const name = document.getElementById('saveOptionsName').value.trim();
+        const studentName = document.getElementById('saveOptionsStudentName').value.trim();
+
+        if (!name) {
+            alert('Please enter a name for your mindmap.');
+            return;
+        }
+        if (!studentName) {
+            alert('Please enter your name for submission.');
+            return;
+        }
+
+        document.getElementById('saveOptionsModal').style.display = 'none';
+        this.showLoading('Saving and submitting...');
+
+        try {
+            // Process elements once - same data for both save and submit
+            const { data, thumbnailUrl } = await this.processElementsForSave();
+
+            // First save as draft
+            await FirebaseService.saveMindmap(name, data, thumbnailUrl);
+            this.currentMindmapName = name;
+            this.currentStudentName = studentName;
+
+            // Then submit the exact same data
+            await FirebaseService.submitMindmap(name, studentName, data);
+
+            this.hideLoading();
+            alert('Saved and submitted successfully! Your teacher will review it.');
+        } catch (error) {
+            this.hideLoading();
+            console.error('Save and submit error:', error);
+            alert('Failed to save and submit: ' + error.message);
+        }
+    }
+
+    // Common function to process elements for saving (removes base64, uploads images)
+    async processElementsForSave() {
+        // Process elements - upload images to Storage (NO base64 in Firestore to avoid 1MB limit)
+        const processedElements = await Promise.all(this.elements.map(async (el, index) => {
+            const processed = { ...el, image: undefined };
+
+            // Handle embedded images
+            if (el.embeddedImage && el.embeddedImage.data) {
+                try {
+                    const filename = `embedded_${index}_${Date.now()}.png`;
+                    const imageUrl = await FirebaseService.uploadImage(
+                        this.dataURLtoBlob(el.embeddedImage.data),
+                        filename
+                    );
+                    processed.embeddedImage = {
+                        position: el.embeddedImage.position,
+                        scale: el.embeddedImage.scale,
+                        originalWidth: el.embeddedImage.originalWidth,
+                        originalHeight: el.embeddedImage.originalHeight,
+                        url: imageUrl,
+                        // NO base64 data stored - only URL to avoid Firestore 1MB limit
+                        image: undefined
+                    };
+                } catch (uploadErr) {
+                    console.warn('Failed to upload embedded image:', uploadErr);
+                    // Store minimal data without base64
+                    processed.embeddedImage = {
+                        position: el.embeddedImage.position,
+                        scale: el.embeddedImage.scale,
+                        originalWidth: el.embeddedImage.originalWidth,
+                        originalHeight: el.embeddedImage.originalHeight,
+                        image: undefined
+                    };
+                }
+            } else if (el.embeddedImage) {
+                processed.embeddedImage = {
+                    position: el.embeddedImage.position,
+                    scale: el.embeddedImage.scale,
+                    originalWidth: el.embeddedImage.originalWidth,
+                    originalHeight: el.embeddedImage.originalHeight,
+                    url: el.embeddedImage.url,
+                    image: undefined
+                };
+            }
+
+            // Handle standalone images
+            if (el.type === 'image' && el.imageData) {
+                try {
+                    const filename = `image_${index}_${Date.now()}.png`;
+                    const imageUrl = await FirebaseService.uploadImage(
+                        this.dataURLtoBlob(el.imageData),
+                        filename
+                    );
+                    processed.imageUrl = imageUrl;
+                    // Remove base64 data to avoid Firestore 1MB limit
+                    processed.imageData = undefined;
+                } catch (uploadErr) {
+                    console.warn('Failed to upload image:', uploadErr);
+                    // Remove base64 to avoid size limit - image won't load on reload
+                    processed.imageData = undefined;
+                }
+                processed.image = undefined;
+            } else if (el.type === 'image') {
+                // Already has URL, just clean up
+                processed.imageData = undefined;
+                processed.image = undefined;
+            }
+
+            return processed;
+        }));
+
+        const data = {
+            elements: processedElements,
+            connections: this.connections.map(c => ({
+                fromIndex: this.elements.indexOf(c.from),
+                toIndex: this.elements.indexOf(c.to),
+                strokeColor: c.strokeColor,
+                strokeWidth: c.strokeWidth
+            }))
+        };
+
+        // Generate and upload thumbnail
+        let thumbnailUrl = null;
+        try {
+            const thumbnailData = this.generateThumbnail();
+            if (thumbnailData) {
+                const thumbnailFilename = `thumb_${Date.now()}.png`;
+                thumbnailUrl = await FirebaseService.uploadImage(
+                    this.dataURLtoBlob(thumbnailData),
+                    thumbnailFilename
+                );
+            }
+        } catch (thumbErr) {
+            console.warn('Failed to generate/upload thumbnail:', thumbErr);
+        }
+
+        return { data, thumbnailUrl };
+    }
+
+    // Submit Modal (kept for backward compatibility)
     showSubmitModal() {
         if (!FirebaseService.isConfigured()) {
             alert('Firebase is not configured.');
@@ -3326,11 +3522,10 @@ class MindmapApp {
             }
         });
 
-        // Admin panel button
-        adminBtn.addEventListener('click', async () => {
-            adminPanel.style.display = 'block';
+        // Function to load and display submissions in admin panel
+        const loadAdminSubmissions = async () => {
             adminMindmapList.innerHTML = '<p>Loading student submissions...</p>';
-            
+
             try {
                 const submissions = await FirebaseService.loadAllSubmissions();
                 if (submissions.length === 0) {
@@ -3345,13 +3540,14 @@ class MindmapApp {
                                 <div class="date">📅 ${s.submittedAt ? s.submittedAt.toLocaleString() : ''}</div>
                                 <div class="status ${s.status || 'pending'}">${(s.status || 'pending').toUpperCase()}</div>
                             </div>
+                            <button class="delete-submission-btn" data-id="${s.id}" title="Delete submission">Delete</button>
                         </div>
                     `).join('');
-                    
-                    // Click to load submission
-                    adminMindmapList.querySelectorAll('.admin-mindmap-item').forEach(item => {
-                        item.addEventListener('click', async () => {
-                            const id = item.dataset.id;
+
+                    // Click on item info to load submission
+                    adminMindmapList.querySelectorAll('.admin-mindmap-item .info').forEach(info => {
+                        info.addEventListener('click', async () => {
+                            const id = info.parentElement.dataset.id;
                             try {
                                 const submission = await FirebaseService.loadSubmission(id);
                                 this.loadMindmapData(submission.data);
@@ -3362,11 +3558,35 @@ class MindmapApp {
                             }
                         });
                     });
+
+                    // Delete button handler
+                    adminMindmapList.querySelectorAll('.delete-submission-btn').forEach(btn => {
+                        btn.addEventListener('click', async (e) => {
+                            e.stopPropagation();
+                            const id = btn.dataset.id;
+                            if (confirm('Are you sure you want to delete this submission? This cannot be undone.')) {
+                                try {
+                                    await FirebaseService.deleteSubmission(id);
+                                    // Reload the list
+                                    loadAdminSubmissions();
+                                } catch (error) {
+                                    console.error('Delete error:', error);
+                                    alert('Failed to delete submission: ' + error.message);
+                                }
+                            }
+                        });
+                    });
                 }
             } catch (error) {
                 console.error('Admin load error:', error);
                 adminMindmapList.innerHTML = '<p>Failed to load submissions.</p>';
             }
+        };
+
+        // Admin panel button
+        adminBtn.addEventListener('click', async () => {
+            adminPanel.style.display = 'block';
+            loadAdminSubmissions();
         });
 
         closeAdminPanel.addEventListener('click', () => {

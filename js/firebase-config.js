@@ -294,6 +294,17 @@ const FirebaseService = {
         };
     },
 
+    // Admin: Delete submission
+    async deleteSubmission(id) {
+        if (!db) {
+            throw new Error('Firebase not initialized');
+        }
+        if (!this.isAdmin()) {
+            throw new Error('Admin access required');
+        }
+        await db.collection('submissions').doc(id).delete();
+    },
+
     // Upload image to Storage
     async uploadImage(file, filename) {
         if (!storage) {

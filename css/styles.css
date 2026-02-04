@@ -885,3 +885,78 @@ body {
     margin-top: 15px;
     font-weight: 500;
 }
+
+/* Save Options Modal */
+.save-options-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.save-options-buttons .action-btn {
+    width: 100%;
+    padding: 12px 16px;
+    font-size: 14px;
+}
+
+.save-only-btn {
+    background: linear-gradient(180deg, #74b9ff 0%, #0984e3 100%) !important;
+    border-color: #0984e3 !important;
+    color: #fff !important;
+}
+
+.save-only-btn:hover {
+    background: linear-gradient(180deg, #81c4ff 0%, #74b9ff 100%) !important;
+}
+
+.save-options-note {
+    margin-top: 15px;
+    padding: 12px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    font-size: 12px;
+    color: #666;
+    line-height: 1.5;
+}
+
+.save-options-note strong {
+    color: #333;
+}
+
+/* Admin delete button for submissions */
+.admin-mindmap-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+}
+
+.admin-mindmap-item .info {
+    flex: 1;
+    cursor: pointer;
+    padding: 5px;
+    border-radius: 6px;
+    transition: background 0.2s ease;
+}
+
+.admin-mindmap-item .info:hover {
+    background: rgba(108, 92, 231, 0.1);
+}
+
+.admin-mindmap-item .delete-submission-btn {
+    background: transparent;
+    border: 1px solid #d63031;
+    color: #d63031;
+    cursor: pointer;
+    font-size: 12px;
+    padding: 8px 14px;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+
+.admin-mindmap-item .delete-submission-btn:hover {
+    background: #d63031;
+    color: #fff;
+}

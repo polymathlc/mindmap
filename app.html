@@ -267,7 +267,31 @@
             <div class="loading-text">Saving...</div>
         </div>
 
-        <!-- Submit Modal -->
+        <!-- Save Options Modal -->
+        <div id="saveOptionsModal" class="modal" style="display: none;">
+            <div class="modal-content">
+                <h3>💾 Save Mindmap</h3>
+                <div class="property-group">
+                    <label>Mindmap Name:</label>
+                    <input type="text" id="saveOptionsName" placeholder="e.g. My Mindmap">
+                </div>
+                <div class="property-group">
+                    <label>Your Name (for submission):</label>
+                    <input type="text" id="saveOptionsStudentName" placeholder="e.g. John Tan">
+                </div>
+                <div class="save-options-buttons">
+                    <button id="saveOnlyBtn" class="action-btn save-only-btn">💾 Save Only</button>
+                    <button id="saveAndSubmitBtn" class="action-btn submit-btn">📤 Save & Submit</button>
+                    <button id="closeSaveOptionsModal" class="action-btn">Cancel</button>
+                </div>
+                <p class="save-options-note">
+                    <strong>Save Only:</strong> Saves as a draft you can edit later.<br>
+                    <strong>Save & Submit:</strong> Saves and submits to your teacher for marking.
+                </p>
+            </div>
+        </div>
+
+        <!-- Submit Modal (kept for backward compatibility) -->
         <div id="submitModal" class="modal" style="display: none;">
             <div class="modal-content">
                 <h3>📤 Submit to Teacher</h3>
