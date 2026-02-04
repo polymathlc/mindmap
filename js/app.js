@@ -10,6 +10,7 @@ class MindmapApp {
         this.elements = [];
         this.connections = []; // Store connections between shapes
         this.selectedElements = [];
+        this.currentMindmapName = null; // Track currently loaded mindmap name
         this.currentTool = 'select';
         this.isDrawing = false;
         this.isDragging = false;
@@ -2453,8 +2454,14 @@ class MindmapApp {
             return;
         }
 
+        // Pre-fill with current mindmap name if loaded from a saved map
+        const nameInput = document.getElementById('mindmapName');
+        if (this.currentMindmapName) {
+            nameInput.value = this.currentMindmapName;
+        }
+
         document.getElementById('saveModal').style.display = 'flex';
-        document.getElementById('mindmapName').focus();
+        nameInput.focus();
     }
 
     async saveMindmap() {
@@ -2563,6 +2570,8 @@ class MindmapApp {
             }
 
             await FirebaseService.saveMindmap(name, data, thumbnailUrl);
+            // Store the name for subsequent saves
+            this.currentMindmapName = name;
             this.hideLoading();
             alert('✅ Draft saved successfully!');
         } catch (error) {
@@ -2633,8 +2642,18 @@ class MindmapApp {
                             originalHeight: el.embeddedImage.originalHeight
                         };
                     }
+                } else if (el.embeddedImage) {
+                    // Image was already loaded from a saved mindmap - preserve URL
+                    processed.embeddedImage = {
+                        position: el.embeddedImage.position,
+                        scale: el.embeddedImage.scale,
+                        originalWidth: el.embeddedImage.originalWidth,
+                        originalHeight: el.embeddedImage.originalHeight,
+                        url: el.embeddedImage.url,
+                        image: undefined
+                    };
                 }
-                
+
                 if (el.type === 'image' && el.imageData) {
                     try {
                         const filename = `submit_img_${index}_${Date.now()}.png`;
@@ -2647,6 +2666,10 @@ class MindmapApp {
                     } catch (uploadErr) {
                         console.warn('Failed to upload image:', uploadErr);
                     }
+                } else if (el.type === 'image') {
+                    // Image was already loaded from a saved mindmap - preserve URL
+                    processed.imageData = undefined;
+                    processed.image = undefined;
                 }
                 
                 return processed;
@@ -2839,6 +2862,8 @@ class MindmapApp {
             this.showLoading('Loading mindmap...');
             const mindmap = await FirebaseService.loadMindmap(id);
             this.loadMindmapData(mindmap.data);
+            // Store the loaded mindmap name for re-saving
+            this.currentMindmapName = mindmap.name;
             this.hideLoading();
         } catch (error) {
             this.hideLoading();
