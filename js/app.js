@@ -695,7 +695,41 @@ class MindmapApp {
                     this.deleteSelected();
                     return;
             }
+        }
 
+        // Arrow keys for micro-adjustment of selected elements
+        if (this.selectedElements.length > 0) {
+            const step = e.shiftKey ? 10 : 1; // Shift for larger movement
+            let dx = 0, dy = 0;
+
+            switch (e.key) {
+                case 'ArrowUp':
+                    dy = -step;
+                    break;
+                case 'ArrowDown':
+                    dy = step;
+                    break;
+                case 'ArrowLeft':
+                    dx = -step;
+                    break;
+                case 'ArrowRight':
+                    dx = step;
+                    break;
+            }
+
+            if (dx !== 0 || dy !== 0) {
+                e.preventDefault();
+                this.selectedElements.forEach(el => {
+                    el.x += dx;
+                    el.y += dy;
+                });
+                this.saveState();
+                this.render();
+                return;
+            }
+        }
+
+        if (!e.ctrlKey && !e.metaKey) {
             // Direct text typing on selected shape - if a printable character is pressed
             if (this.selectedElements.length === 1 && e.key.length === 1 && !e.ctrlKey && !e.metaKey) {
                 const element = this.selectedElements[0];
