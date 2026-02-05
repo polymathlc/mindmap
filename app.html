@@ -63,7 +63,10 @@
             </div>
             <div class="toolbar-section user-section">
                 <span id="userStatus">Not signed in</span>
+                <button id="assignmentsBtn" class="action-btn assignments-btn" style="display: none;">📋 Assignments</button>
+                <button id="profileBtn" class="action-btn profile-btn" style="display: none;">👤 Profile</button>
                 <button id="adminBtn" class="action-btn admin-btn" style="display: none;">📋 Submissions</button>
+                <button id="adminAssignmentsBtn" class="action-btn admin-btn" style="display: none;">🎯 Manage Assignments</button>
                 <button id="signInBtn" class="action-btn">Sign In</button>
             </div>
         </div>
@@ -353,6 +356,169 @@
                         <button id="tutorialPrev" class="action-btn">Previous</button>
                         <button id="tutorialNext" class="action-btn primary">Next</button>
                         <button id="tutorialFinish" class="action-btn primary" style="display: none;">Get Started!</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Profile Setup Modal -->
+        <div id="profileModal" class="modal" style="display: none;">
+            <div class="modal-content">
+                <h3>📝 Complete Your Profile</h3>
+                <p style="margin-bottom: 15px; color: #666;">Please fill in your details to participate in assignments and win prizes!</p>
+                <div class="property-group">
+                    <label>Your Name:</label>
+                    <input type="text" id="profileStudentName" placeholder="e.g. John Tan">
+                </div>
+                <div class="property-group">
+                    <label>Level:</label>
+                    <select id="profileLevel">
+                        <option value="">Select your level...</option>
+                        <!-- Options populated by JS -->
+                    </select>
+                </div>
+                <div class="property-group">
+                    <label>Mailing Address (for prizes):</label>
+                    <textarea id="profileAddress" rows="3" placeholder="Block 123 Ang Mo Kio Ave 1&#10;#01-234&#10;Singapore 560123"></textarea>
+                </div>
+                <div id="profileError" class="error-message" style="display: none;"></div>
+                <div class="modal-actions">
+                    <button id="saveProfile" class="action-btn primary">Save Profile</button>
+                    <button id="closeProfileModal" class="action-btn">Later</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Assignments Panel (Student View) -->
+        <div id="assignmentsPanel" class="side-panel" style="display: none;">
+            <div class="panel-header">
+                <h3>📋 My Assignments</h3>
+                <button id="closeAssignmentsPanel" class="close-panel-btn">&times;</button>
+            </div>
+            <div id="assignmentsList">
+                <p>Loading assignments...</p>
+            </div>
+        </div>
+
+        <!-- Assignment Detail Modal -->
+        <div id="assignmentDetailModal" class="modal" style="display: none;">
+            <div class="modal-content assignment-detail-content">
+                <button id="closeAssignmentDetail" class="close-modal-btn">&times;</button>
+                <div id="assignmentDetailContent">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Submit Assignment Modal -->
+        <div id="submitAssignmentModal" class="modal" style="display: none;">
+            <div class="modal-content">
+                <h3>📤 Submit Assignment</h3>
+                <p id="submitAssignmentTopic" style="margin-bottom: 15px; color: #666;"></p>
+                <div id="submitAssignmentError" class="error-message" style="display: none;"></div>
+                <div class="modal-actions">
+                    <button id="confirmAssignmentSubmit" class="action-btn submit-btn">Submit My Mind Map</button>
+                    <button id="closeSubmitAssignmentModal" class="action-btn">Cancel</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Admin: Assignments Management Panel -->
+        <div id="adminAssignmentsPanel" class="side-panel admin-panel-large" style="display: none;">
+            <div class="panel-header">
+                <h3>📋 Manage Assignments</h3>
+                <button id="closeAdminAssignmentsPanel" class="close-panel-btn">&times;</button>
+            </div>
+            <div class="panel-toolbar">
+                <button id="createAssignmentBtn" class="action-btn primary">+ Create Assignment</button>
+            </div>
+            <div id="adminAssignmentsList">
+                <p>Loading assignments...</p>
+            </div>
+        </div>
+
+        <!-- Admin: Create/Edit Assignment Modal -->
+        <div id="assignmentFormModal" class="modal" style="display: none;">
+            <div class="modal-content">
+                <h3 id="assignmentFormTitle">Create Assignment</h3>
+                <input type="hidden" id="editingAssignmentId" value="">
+                <div class="property-group">
+                    <label>Topic:</label>
+                    <input type="text" id="assignmentTopic" placeholder="e.g. Water Cycle">
+                </div>
+                <div class="property-group">
+                    <label>Description (optional):</label>
+                    <textarea id="assignmentDescription" rows="2" placeholder="Create a mind map about..."></textarea>
+                </div>
+                <div class="property-group">
+                    <label>Levels:</label>
+                    <div id="assignmentLevels" class="checkbox-group">
+                        <!-- Checkboxes populated by JS -->
+                    </div>
+                </div>
+                <div class="property-group">
+                    <label>Prize:</label>
+                    <input type="text" id="assignmentPrize" placeholder="e.g. $50 Popular voucher">
+                </div>
+                <div class="property-group">
+                    <label>Deadline:</label>
+                    <input type="datetime-local" id="assignmentDeadline">
+                </div>
+                <div id="assignmentFormError" class="error-message" style="display: none;"></div>
+                <div class="modal-actions">
+                    <button id="saveAssignment" class="action-btn primary">Save Assignment</button>
+                    <button id="closeAssignmentForm" class="action-btn">Cancel</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Admin: View Assignment Submissions Modal -->
+        <div id="viewSubmissionsModal" class="modal" style="display: none;">
+            <div class="modal-content submissions-modal-content">
+                <button id="closeViewSubmissions" class="close-modal-btn">&times;</button>
+                <div class="submissions-header">
+                    <h3 id="submissionsAssignmentTitle">Submissions</h3>
+                    <div class="submissions-actions">
+                        <button id="closeAssignmentBtn" class="action-btn danger">Close & Pick Winner</button>
+                    </div>
+                </div>
+                <div id="submissionsList">
+                    <p>Loading submissions...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Admin: Grade Submission Modal -->
+        <div id="gradeModal" class="modal" style="display: none;">
+            <div class="modal-content">
+                <h3>📝 Grade Submission</h3>
+                <input type="hidden" id="gradingSubmissionId" value="">
+                <p id="gradingStudentInfo" style="margin-bottom: 15px; color: #666;"></p>
+                <div class="property-group">
+                    <label>Score (0-100):</label>
+                    <input type="number" id="gradeScore" min="0" max="100" placeholder="85">
+                </div>
+                <div class="property-group">
+                    <label>Feedback (optional):</label>
+                    <textarea id="gradeFeedback" rows="3" placeholder="Great work! Consider adding more details to..."></textarea>
+                </div>
+                <div id="gradeError" class="error-message" style="display: none;"></div>
+                <div class="modal-actions">
+                    <button id="saveGrade" class="action-btn primary">Save Grade</button>
+                    <button id="closeGradeModal" class="action-btn">Cancel</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Winner Announcement Modal -->
+        <div id="winnerModal" class="modal" style="display: none;">
+            <div class="modal-content winner-modal-content">
+                <button id="closeWinnerModal" class="close-modal-btn">&times;</button>
+                <div class="winner-content">
+                    <div class="trophy-icon">🏆</div>
+                    <h2>Assignment Completed!</h2>
+                    <div id="winnerDetails">
+                        <!-- Populated by JS -->
                     </div>
                 </div>
             </div>

@@ -4117,7 +4117,11 @@ class MindmapApp {
         });
 
         // Auth state changes
-        FirebaseService.onAuthStateChanged((user) => {
+        FirebaseService.onAuthStateChanged(async (user) => {
+            const assignmentsBtn = document.getElementById('assignmentsBtn');
+            const profileBtn = document.getElementById('profileBtn');
+            const adminAssignmentsBtn = document.getElementById('adminAssignmentsBtn');
+            
             if (user) {
                 const verified = user.emailVerified || user.email === ADMIN_EMAIL;
                 userStatus.innerHTML = user.email + (verified ?
@@ -4125,18 +4129,46 @@ class MindmapApp {
                     '<span class="unverified-badge">⚠ Unverified</span>');
                 signInBtn.textContent = 'Sign Out';
 
-                // Show admin button if admin
+                // Show admin buttons if admin
                 if (FirebaseService.isAdmin()) {
                     adminBtn.style.display = 'inline-block';
+                    adminAssignmentsBtn.style.display = 'inline-block';
+                    assignmentsBtn.style.display = 'none';
+                    profileBtn.style.display = 'none';
                 } else {
                     adminBtn.style.display = 'none';
+                    adminAssignmentsBtn.style.display = 'none';
+                    
+                    // Show student buttons
+                    assignmentsBtn.style.display = 'inline-block';
+                    profileBtn.style.display = 'inline-block';
+                    
+                    // Check if profile is complete, prompt if not
+                    if (verified) {
+                        try {
+                            const profileComplete = await FirebaseService.isProfileComplete();
+                            if (!profileComplete) {
+                                // Show profile setup modal after a short delay
+                                setTimeout(() => this.showProfileModal(), 500);
+                            }
+                        } catch (error) {
+                            console.error('Error checking profile:', error);
+                        }
+                    }
                 }
             } else {
                 userStatus.textContent = 'Not signed in';
                 signInBtn.textContent = 'Sign In';
                 adminBtn.style.display = 'none';
+                adminAssignmentsBtn.style.display = 'none';
+                assignmentsBtn.style.display = 'none';
+                profileBtn.style.display = 'none';
             }
         });
+        
+        // Setup profile and assignments after auth
+        this.setupProfileSystem();
+        this.setupAssignmentsSystem();
     }
 
     // Tutorial System
@@ -4541,6 +4573,878 @@ class MindmapApp {
             this.currentTutorialStep++;
             this.renderTutorialStep();
         }
+    }
+
+    // ==========================================
+    // PROFILE SYSTEM
+    // ==========================================
+    
+    setupProfileSystem() {
+        const profileModal = document.getElementById('profileModal');
+        const profileBtn = document.getElementById('profileBtn');
+        const saveProfile = document.getElementById('saveProfile');
+        const closeProfileModal = document.getElementById('closeProfileModal');
+        const profileLevel = document.getElementById('profileLevel');
+        const profileError = document.getElementById('profileError');
+        
+        // Populate levels dropdown
+        if (window.STUDENT_LEVELS) {
+            profileLevel.innerHTML = '<option value="">Select your level...</option>' +
+                window.STUDENT_LEVELS.map(l => `<option value="${l}">${l}</option>`).join('');
+        }
+        
+        // Profile button click
+        profileBtn.addEventListener('click', () => this.showProfileModal());
+        
+        // Close modal
+        closeProfileModal.addEventListener('click', () => {
+            profileModal.style.display = 'none';
+        });
+        
+        profileModal.addEventListener('click', (e) => {
+            if (e.target === profileModal) profileModal.style.display = 'none';
+        });
+        
+        // Save profile
+        saveProfile.addEventListener('click', async () => {
+            const name = document.getElementById('profileStudentName').value.trim();
+            const level = profileLevel.value;
+            const address = document.getElementById('profileAddress').value.trim();
+            
+            profileError.style.display = 'none';
+            
+            if (!name) {
+                profileError.textContent = 'Please enter your name';
+                profileError.style.display = 'block';
+                return;
+            }
+            if (!level) {
+                profileError.textContent = 'Please select your level';
+                profileError.style.display = 'block';
+                return;
+            }
+            if (!address) {
+                profileError.textContent = 'Please enter your address for prize delivery';
+                profileError.style.display = 'block';
+                return;
+            }
+            
+            try {
+                saveProfile.disabled = true;
+                saveProfile.textContent = 'Saving...';
+                
+                await FirebaseService.saveUserProfile({
+                    studentName: name,
+                    level: level,
+                    address: address
+                });
+                
+                profileModal.style.display = 'none';
+                alert('✅ Profile saved successfully!');
+            } catch (error) {
+                console.error('Save profile error:', error);
+                profileError.textContent = 'Failed to save profile: ' + error.message;
+                profileError.style.display = 'block';
+            } finally {
+                saveProfile.disabled = false;
+                saveProfile.textContent = 'Save Profile';
+            }
+        });
+    }
+    
+    async showProfileModal() {
+        const profileModal = document.getElementById('profileModal');
+        const profileStudentName = document.getElementById('profileStudentName');
+        const profileLevel = document.getElementById('profileLevel');
+        const profileAddress = document.getElementById('profileAddress');
+        const profileError = document.getElementById('profileError');
+        
+        profileError.style.display = 'none';
+        
+        // Load existing profile if any
+        try {
+            const profile = await FirebaseService.getUserProfile();
+            if (profile) {
+                profileStudentName.value = profile.studentName || '';
+                profileLevel.value = profile.level || '';
+                profileAddress.value = profile.address || '';
+            }
+        } catch (error) {
+            console.error('Load profile error:', error);
+        }
+        
+        profileModal.style.display = 'flex';
+    }
+
+    // ==========================================
+    // ASSIGNMENTS SYSTEM
+    // ==========================================
+    
+    setupAssignmentsSystem() {
+        // Current assignment being worked on
+        this.currentAssignmentId = null;
+        
+        // Student: Assignments panel
+        const assignmentsBtn = document.getElementById('assignmentsBtn');
+        const assignmentsPanel = document.getElementById('assignmentsPanel');
+        const closeAssignmentsPanel = document.getElementById('closeAssignmentsPanel');
+        
+        assignmentsBtn.addEventListener('click', () => this.showAssignmentsPanel());
+        closeAssignmentsPanel.addEventListener('click', () => {
+            assignmentsPanel.style.display = 'none';
+        });
+        
+        // Assignment detail modal
+        const assignmentDetailModal = document.getElementById('assignmentDetailModal');
+        const closeAssignmentDetail = document.getElementById('closeAssignmentDetail');
+        
+        closeAssignmentDetail.addEventListener('click', () => {
+            assignmentDetailModal.style.display = 'none';
+        });
+        
+        assignmentDetailModal.addEventListener('click', (e) => {
+            if (e.target === assignmentDetailModal) assignmentDetailModal.style.display = 'none';
+        });
+        
+        // Submit assignment modal
+        const submitAssignmentModal = document.getElementById('submitAssignmentModal');
+        const closeSubmitAssignmentModal = document.getElementById('closeSubmitAssignmentModal');
+        const confirmAssignmentSubmit = document.getElementById('confirmAssignmentSubmit');
+        
+        closeSubmitAssignmentModal.addEventListener('click', () => {
+            submitAssignmentModal.style.display = 'none';
+        });
+        
+        submitAssignmentModal.addEventListener('click', (e) => {
+            if (e.target === submitAssignmentModal) submitAssignmentModal.style.display = 'none';
+        });
+        
+        confirmAssignmentSubmit.addEventListener('click', () => this.submitAssignmentMindmap());
+        
+        // Admin: Assignments management
+        const adminAssignmentsBtn = document.getElementById('adminAssignmentsBtn');
+        const adminAssignmentsPanel = document.getElementById('adminAssignmentsPanel');
+        const closeAdminAssignmentsPanel = document.getElementById('closeAdminAssignmentsPanel');
+        const createAssignmentBtn = document.getElementById('createAssignmentBtn');
+        
+        adminAssignmentsBtn.addEventListener('click', () => this.showAdminAssignmentsPanel());
+        closeAdminAssignmentsPanel.addEventListener('click', () => {
+            adminAssignmentsPanel.style.display = 'none';
+        });
+        createAssignmentBtn.addEventListener('click', () => this.showAssignmentForm());
+        
+        // Assignment form modal
+        const assignmentFormModal = document.getElementById('assignmentFormModal');
+        const closeAssignmentForm = document.getElementById('closeAssignmentForm');
+        const saveAssignment = document.getElementById('saveAssignment');
+        const assignmentLevels = document.getElementById('assignmentLevels');
+        
+        // Populate levels checkboxes
+        if (window.STUDENT_LEVELS) {
+            assignmentLevels.innerHTML = window.STUDENT_LEVELS.map(l => 
+                `<label><input type="checkbox" value="${l}"><span>${l}</span></label>`
+            ).join('');
+        }
+        
+        closeAssignmentForm.addEventListener('click', () => {
+            assignmentFormModal.style.display = 'none';
+        });
+        
+        assignmentFormModal.addEventListener('click', (e) => {
+            if (e.target === assignmentFormModal) assignmentFormModal.style.display = 'none';
+        });
+        
+        saveAssignment.addEventListener('click', () => this.saveAssignmentForm());
+        
+        // View submissions modal
+        const viewSubmissionsModal = document.getElementById('viewSubmissionsModal');
+        const closeViewSubmissions = document.getElementById('closeViewSubmissions');
+        const closeAssignmentBtn = document.getElementById('closeAssignmentBtn');
+        
+        closeViewSubmissions.addEventListener('click', () => {
+            viewSubmissionsModal.style.display = 'none';
+        });
+        
+        viewSubmissionsModal.addEventListener('click', (e) => {
+            if (e.target === viewSubmissionsModal) viewSubmissionsModal.style.display = 'none';
+        });
+        
+        closeAssignmentBtn.addEventListener('click', () => this.closeAssignmentAndPickWinner());
+        
+        // Grade modal
+        const gradeModal = document.getElementById('gradeModal');
+        const closeGradeModal = document.getElementById('closeGradeModal');
+        const saveGrade = document.getElementById('saveGrade');
+        
+        closeGradeModal.addEventListener('click', () => {
+            gradeModal.style.display = 'none';
+        });
+        
+        gradeModal.addEventListener('click', (e) => {
+            if (e.target === gradeModal) gradeModal.style.display = 'none';
+        });
+        
+        saveGrade.addEventListener('click', () => this.saveGradeForm());
+        
+        // Winner modal
+        const winnerModal = document.getElementById('winnerModal');
+        const closeWinnerModal = document.getElementById('closeWinnerModal');
+        
+        closeWinnerModal.addEventListener('click', () => {
+            winnerModal.style.display = 'none';
+        });
+        
+        winnerModal.addEventListener('click', (e) => {
+            if (e.target === winnerModal) winnerModal.style.display = 'none';
+        });
+    }
+    
+    // Student: Show assignments panel
+    async showAssignmentsPanel() {
+        const assignmentsPanel = document.getElementById('assignmentsPanel');
+        const assignmentsList = document.getElementById('assignmentsList');
+        
+        assignmentsPanel.style.display = 'flex';
+        assignmentsList.innerHTML = '<p>Loading assignments...</p>';
+        
+        try {
+            // Check profile first
+            const profile = await FirebaseService.getUserProfile();
+            if (!profile || !profile.level) {
+                assignmentsList.innerHTML = `
+                    <div class="empty-state">
+                        <div class="icon">📝</div>
+                        <h4>Complete Your Profile</h4>
+                        <p>Please set up your profile first to see assignments for your level.</p>
+                        <button class="action-btn primary" onclick="mindmapApp.showProfileModal()">Set Up Profile</button>
+                    </div>
+                `;
+                return;
+            }
+            
+            const assignments = await FirebaseService.getAssignmentsForLevel(profile.level);
+            
+            if (assignments.length === 0) {
+                assignmentsList.innerHTML = `
+                    <div class="empty-state">
+                        <div class="icon">📋</div>
+                        <h4>No Assignments</h4>
+                        <p>There are no active assignments for ${profile.level} right now.</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            // Check submission status for each assignment
+            const assignmentsWithStatus = await Promise.all(assignments.map(async (a) => {
+                const submission = await FirebaseService.getUserSubmissionForAssignment(a.id);
+                return { ...a, submission };
+            }));
+            
+            assignmentsList.innerHTML = assignmentsWithStatus.map(a => {
+                const isDeadlineSoon = a.deadline && (a.deadline - new Date()) < 24 * 60 * 60 * 1000;
+                const statusClass = a.submission ? (a.submission.status === 'graded' ? 'graded' : 'submitted') : '';
+                
+                return `
+                    <div class="assignment-card ${statusClass}" data-id="${a.id}">
+                        <h4>${a.topic}</h4>
+                        ${a.description ? `<p style="color: #666; font-size: 13px;">${a.description}</p>` : ''}
+                        <div class="prize">🎁 Prize: ${a.prize}</div>
+                        <div class="deadline ${isDeadlineSoon ? 'soon' : ''}">
+                            ⏰ Deadline: ${a.deadline ? a.deadline.toLocaleString() : 'No deadline'}
+                        </div>
+                        ${a.submission ? `
+                            <span class="status-badge ${a.submission.status}">
+                                ${a.submission.status === 'graded' ? `✅ Graded: ${a.submission.score}/100` : '📤 Submitted'}
+                            </span>
+                        ` : ''}
+                    </div>
+                `;
+            }).join('');
+            
+            // Click handlers
+            assignmentsList.querySelectorAll('.assignment-card').forEach(card => {
+                card.addEventListener('click', () => {
+                    const assignment = assignmentsWithStatus.find(a => a.id === card.dataset.id);
+                    this.showAssignmentDetail(assignment);
+                });
+            });
+            
+        } catch (error) {
+            console.error('Load assignments error:', error);
+            assignmentsList.innerHTML = '<p>Failed to load assignments.</p>';
+        }
+    }
+    
+    // Student: Show assignment detail
+    async showAssignmentDetail(assignment) {
+        const modal = document.getElementById('assignmentDetailModal');
+        const content = document.getElementById('assignmentDetailContent');
+        
+        const isDeadlinePassed = assignment.deadline && assignment.deadline < new Date();
+        const hasSubmission = !!assignment.submission;
+        
+        content.innerHTML = `
+            <h2>${assignment.topic}</h2>
+            ${assignment.description ? `<p style="color: #666;">${assignment.description}</p>` : ''}
+            
+            <div class="prize-banner">
+                <h3>🎁 ${assignment.prize}</h3>
+                <p>Prize for the highest scorer!</p>
+            </div>
+            
+            <div class="deadline-banner">
+                <span>⏰</span>
+                <span>Deadline: ${assignment.deadline ? assignment.deadline.toLocaleString() : 'No deadline'}</span>
+            </div>
+            
+            ${hasSubmission ? `
+                <div style="background: #d1ecf1; padding: 15px; border-radius: 8px; margin: 15px 0;">
+                    <strong>Your Submission:</strong><br>
+                    Status: ${assignment.submission.status === 'graded' ? 
+                        `<span style="color: #28a745;">Graded - ${assignment.submission.score}/100</span>` : 
+                        '<span style="color: #17a2b8;">Submitted - Awaiting grading</span>'
+                    }
+                    ${assignment.submission.feedback ? `<br><br>Feedback: ${assignment.submission.feedback}` : ''}
+                </div>
+            ` : ''}
+            
+            <div class="action-buttons">
+                ${isDeadlinePassed ? `
+                    <button class="action-btn" disabled>Deadline Passed</button>
+                ` : `
+                    <button class="action-btn primary" id="buildMindmapBtn">
+                        ${hasSubmission ? '📝 Edit & Resubmit' : '🎨 Build Mind Map'}
+                    </button>
+                `}
+                <button class="action-btn" onclick="document.getElementById('assignmentDetailModal').style.display='none'">Close</button>
+            </div>
+        `;
+        
+        // Build mindmap button
+        const buildBtn = content.querySelector('#buildMindmapBtn');
+        if (buildBtn) {
+            buildBtn.addEventListener('click', async () => {
+                this.currentAssignmentId = assignment.id;
+                
+                // If has previous submission, load it
+                if (hasSubmission && assignment.submission.data) {
+                    this.loadMindmapData(assignment.submission.data);
+                } else {
+                    // Clear canvas and start fresh
+                    this.elements = [];
+                    this.connections = [];
+                    this.selectedElements = [];
+                    this.saveState();
+                    this.render();
+                }
+                
+                modal.style.display = 'none';
+                document.getElementById('assignmentsPanel').style.display = 'none';
+                
+                // Show notification about current assignment
+                this.showAssignmentNotification(assignment.topic);
+            });
+        }
+        
+        modal.style.display = 'flex';
+    }
+    
+    showAssignmentNotification(topic) {
+        // Create a notification bar
+        let notification = document.getElementById('assignmentNotification');
+        if (!notification) {
+            notification = document.createElement('div');
+            notification.id = 'assignmentNotification';
+            notification.style.cssText = `
+                position: fixed;
+                top: 60px;
+                left: 50%;
+                transform: translateX(-50%);
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                padding: 12px 20px;
+                border-radius: 8px;
+                box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+                z-index: 1000;
+                display: flex;
+                align-items: center;
+                gap: 15px;
+                font-size: 14px;
+            `;
+            document.body.appendChild(notification);
+        }
+        
+        notification.innerHTML = `
+            <span>📋 Working on: <strong>${topic}</strong></span>
+            <button id="submitAssignmentBtn" style="
+                background: white;
+                color: #667eea;
+                border: none;
+                padding: 6px 15px;
+                border-radius: 5px;
+                cursor: pointer;
+                font-weight: 600;
+            ">Submit</button>
+            <button id="cancelAssignmentBtn" style="
+                background: transparent;
+                color: white;
+                border: 1px solid rgba(255,255,255,0.5);
+                padding: 6px 15px;
+                border-radius: 5px;
+                cursor: pointer;
+            ">Cancel</button>
+        `;
+        
+        document.getElementById('submitAssignmentBtn').addEventListener('click', () => {
+            this.showSubmitAssignmentModal();
+        });
+        
+        document.getElementById('cancelAssignmentBtn').addEventListener('click', () => {
+            this.currentAssignmentId = null;
+            notification.remove();
+        });
+    }
+    
+    showSubmitAssignmentModal() {
+        if (!this.currentAssignmentId) {
+            alert('No assignment selected');
+            return;
+        }
+        
+        if (this.elements.length === 0) {
+            alert('Please create a mind map before submitting.');
+            return;
+        }
+        
+        const modal = document.getElementById('submitAssignmentModal');
+        document.getElementById('submitAssignmentError').style.display = 'none';
+        modal.style.display = 'flex';
+    }
+    
+    async submitAssignmentMindmap() {
+        const modal = document.getElementById('submitAssignmentModal');
+        const errorEl = document.getElementById('submitAssignmentError');
+        const confirmBtn = document.getElementById('confirmAssignmentSubmit');
+        
+        errorEl.style.display = 'none';
+        
+        if (!this.currentAssignmentId) {
+            errorEl.textContent = 'No assignment selected';
+            errorEl.style.display = 'block';
+            return;
+        }
+        
+        try {
+            confirmBtn.disabled = true;
+            confirmBtn.textContent = 'Submitting...';
+            
+            // Prepare data with embedded images
+            const data = {
+                elements: this.elements.map(el => {
+                    const copy = { ...el };
+                    // Keep embedded images as-is
+                    return copy;
+                }),
+                connections: this.connections,
+                panOffset: this.panOffset,
+                zoom: this.zoom
+            };
+            
+            await FirebaseService.submitAssignmentMindmap(this.currentAssignmentId, data);
+            
+            modal.style.display = 'none';
+            
+            // Remove notification
+            const notification = document.getElementById('assignmentNotification');
+            if (notification) notification.remove();
+            
+            this.currentAssignmentId = null;
+            
+            alert('✅ Mind map submitted successfully! Your teacher will grade it.');
+            
+        } catch (error) {
+            console.error('Submit error:', error);
+            errorEl.textContent = 'Failed to submit: ' + error.message;
+            errorEl.style.display = 'block';
+        } finally {
+            confirmBtn.disabled = false;
+            confirmBtn.textContent = 'Submit My Mind Map';
+        }
+    }
+    
+    // Admin: Show assignments management panel
+    async showAdminAssignmentsPanel() {
+        const panel = document.getElementById('adminAssignmentsPanel');
+        const list = document.getElementById('adminAssignmentsList');
+        
+        panel.style.display = 'flex';
+        list.innerHTML = '<p>Loading assignments...</p>';
+        
+        try {
+            const assignments = await FirebaseService.getAllAssignments();
+            
+            if (assignments.length === 0) {
+                list.innerHTML = `
+                    <div class="empty-state">
+                        <div class="icon">📋</div>
+                        <h4>No Assignments</h4>
+                        <p>Click "Create Assignment" to create your first assignment.</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            list.innerHTML = assignments.map(a => {
+                const isActive = a.status === 'active';
+                const isCompleted = a.status === 'completed';
+                
+                return `
+                    <div class="assignment-card ${a.status}">
+                        <div style="display: flex; justify-content: space-between; align-items: start;">
+                            <div>
+                                <h4>${a.topic}</h4>
+                                <div class="levels">
+                                    ${a.levels.map(l => `<span class="level-badge">${l}</span>`).join('')}
+                                </div>
+                                <div class="prize">🎁 ${a.prize}</div>
+                                <div class="deadline">⏰ ${a.deadline ? a.deadline.toLocaleString() : 'No deadline'}</div>
+                                <span class="status-badge ${a.status}">${a.status.toUpperCase()}</span>
+                                ${isCompleted && a.winnerName ? `<div style="margin-top: 8px; color: #28a745;">🏆 Winner: ${a.winnerName} (${a.winnerScore}/100)</div>` : ''}
+                            </div>
+                            <div style="display: flex; flex-direction: column; gap: 6px;">
+                                <button class="action-btn view-submissions-btn" data-id="${a.id}">View Submissions</button>
+                                ${isActive ? `<button class="action-btn edit-assignment-btn" data-id="${a.id}">Edit</button>` : ''}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            // Click handlers
+            list.querySelectorAll('.view-submissions-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const assignment = assignments.find(a => a.id === btn.dataset.id);
+                    this.showSubmissionsModal(assignment);
+                });
+            });
+            
+            list.querySelectorAll('.edit-assignment-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const assignment = assignments.find(a => a.id === btn.dataset.id);
+                    this.showAssignmentForm(assignment);
+                });
+            });
+            
+        } catch (error) {
+            console.error('Load admin assignments error:', error);
+            list.innerHTML = '<p>Failed to load assignments.</p>';
+        }
+    }
+    
+    // Admin: Show assignment form (create/edit)
+    showAssignmentForm(assignment = null) {
+        const modal = document.getElementById('assignmentFormModal');
+        const title = document.getElementById('assignmentFormTitle');
+        const editingId = document.getElementById('editingAssignmentId');
+        const topic = document.getElementById('assignmentTopic');
+        const description = document.getElementById('assignmentDescription');
+        const prize = document.getElementById('assignmentPrize');
+        const deadline = document.getElementById('assignmentDeadline');
+        const errorEl = document.getElementById('assignmentFormError');
+        
+        errorEl.style.display = 'none';
+        
+        if (assignment) {
+            title.textContent = 'Edit Assignment';
+            editingId.value = assignment.id;
+            topic.value = assignment.topic || '';
+            description.value = assignment.description || '';
+            prize.value = assignment.prize || '';
+            
+            // Format deadline for datetime-local input
+            if (assignment.deadline) {
+                const d = assignment.deadline;
+                deadline.value = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}T${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+            } else {
+                deadline.value = '';
+            }
+            
+            // Set level checkboxes
+            document.querySelectorAll('#assignmentLevels input').forEach(cb => {
+                cb.checked = assignment.levels && assignment.levels.includes(cb.value);
+            });
+        } else {
+            title.textContent = 'Create Assignment';
+            editingId.value = '';
+            topic.value = '';
+            description.value = '';
+            prize.value = '';
+            deadline.value = '';
+            document.querySelectorAll('#assignmentLevels input').forEach(cb => cb.checked = false);
+        }
+        
+        modal.style.display = 'flex';
+    }
+    
+    async saveAssignmentForm() {
+        const modal = document.getElementById('assignmentFormModal');
+        const editingId = document.getElementById('editingAssignmentId').value;
+        const topic = document.getElementById('assignmentTopic').value.trim();
+        const description = document.getElementById('assignmentDescription').value.trim();
+        const prize = document.getElementById('assignmentPrize').value.trim();
+        const deadline = document.getElementById('assignmentDeadline').value;
+        const errorEl = document.getElementById('assignmentFormError');
+        const saveBtn = document.getElementById('saveAssignment');
+        
+        // Get selected levels
+        const levels = Array.from(document.querySelectorAll('#assignmentLevels input:checked')).map(cb => cb.value);
+        
+        errorEl.style.display = 'none';
+        
+        if (!topic) {
+            errorEl.textContent = 'Please enter a topic';
+            errorEl.style.display = 'block';
+            return;
+        }
+        if (levels.length === 0) {
+            errorEl.textContent = 'Please select at least one level';
+            errorEl.style.display = 'block';
+            return;
+        }
+        if (!prize) {
+            errorEl.textContent = 'Please enter a prize';
+            errorEl.style.display = 'block';
+            return;
+        }
+        if (!deadline) {
+            errorEl.textContent = 'Please set a deadline';
+            errorEl.style.display = 'block';
+            return;
+        }
+        
+        try {
+            saveBtn.disabled = true;
+            saveBtn.textContent = 'Saving...';
+            
+            const data = {
+                topic,
+                description,
+                levels,
+                prize,
+                deadline
+            };
+            
+            if (editingId) {
+                await FirebaseService.updateAssignment(editingId, data);
+            } else {
+                await FirebaseService.createAssignment(data);
+            }
+            
+            modal.style.display = 'none';
+            this.showAdminAssignmentsPanel(); // Refresh list
+            
+        } catch (error) {
+            console.error('Save assignment error:', error);
+            errorEl.textContent = 'Failed to save: ' + error.message;
+            errorEl.style.display = 'block';
+        } finally {
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'Save Assignment';
+        }
+    }
+    
+    // Admin: Show submissions for an assignment
+    async showSubmissionsModal(assignment) {
+        this.currentViewingAssignment = assignment;
+        
+        const modal = document.getElementById('viewSubmissionsModal');
+        const title = document.getElementById('submissionsAssignmentTitle');
+        const list = document.getElementById('submissionsList');
+        const closeBtn = document.getElementById('closeAssignmentBtn');
+        
+        title.textContent = `Submissions: ${assignment.topic}`;
+        closeBtn.style.display = assignment.status === 'active' ? 'inline-block' : 'none';
+        
+        list.innerHTML = '<p>Loading submissions...</p>';
+        modal.style.display = 'flex';
+        
+        try {
+            const submissions = await FirebaseService.getAssignmentSubmissions(assignment.id);
+            
+            if (submissions.length === 0) {
+                list.innerHTML = `
+                    <div class="empty-state">
+                        <div class="icon">📭</div>
+                        <h4>No Submissions Yet</h4>
+                        <p>Students haven't submitted any mind maps for this assignment yet.</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            list.innerHTML = submissions.map(s => `
+                <div class="submission-card" data-id="${s.id}">
+                    <div class="thumbnail">
+                        ${s.thumbnail ? `<img src="${s.thumbnail}" alt="Preview">` : '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#999;">No preview</div>'}
+                    </div>
+                    <div class="info">
+                        <div class="student-name">${s.studentName || 'Unknown'}</div>
+                        <div class="meta">${s.level} · ${s.userEmail}</div>
+                        <div class="meta">Submitted: ${s.submittedAt ? s.submittedAt.toLocaleString() : ''}</div>
+                    </div>
+                    <div class="score ${s.score === null ? 'not-graded' : ''}">
+                        ${s.score !== null ? s.score : 'Not graded'}
+                    </div>
+                    <div class="actions">
+                        <button class="action-btn view-btn" data-id="${s.id}">View</button>
+                        <button class="action-btn primary grade-btn" data-id="${s.id}">Grade</button>
+                    </div>
+                </div>
+            `).join('');
+            
+            // Store submissions for reference
+            this.currentSubmissions = submissions;
+            
+            // Click handlers
+            list.querySelectorAll('.view-btn').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const submission = submissions.find(s => s.id === btn.dataset.id);
+                    try {
+                        const fullSubmission = await FirebaseService.loadAssignmentSubmission(submission.id);
+                        this.loadMindmapData(fullSubmission.data);
+                        modal.style.display = 'none';
+                    } catch (error) {
+                        console.error('Load submission error:', error);
+                        alert('Failed to load submission');
+                    }
+                });
+            });
+            
+            list.querySelectorAll('.grade-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const submission = submissions.find(s => s.id === btn.dataset.id);
+                    this.showGradeModal(submission);
+                });
+            });
+            
+        } catch (error) {
+            console.error('Load submissions error:', error);
+            list.innerHTML = '<p>Failed to load submissions.</p>';
+        }
+    }
+    
+    // Admin: Show grade modal
+    showGradeModal(submission) {
+        const modal = document.getElementById('gradeModal');
+        const submissionId = document.getElementById('gradingSubmissionId');
+        const studentInfo = document.getElementById('gradingStudentInfo');
+        const scoreInput = document.getElementById('gradeScore');
+        const feedbackInput = document.getElementById('gradeFeedback');
+        const errorEl = document.getElementById('gradeError');
+        
+        submissionId.value = submission.id;
+        studentInfo.textContent = `Student: ${submission.studentName} (${submission.level})`;
+        scoreInput.value = submission.score || '';
+        feedbackInput.value = submission.feedback || '';
+        errorEl.style.display = 'none';
+        
+        modal.style.display = 'flex';
+    }
+    
+    async saveGradeForm() {
+        const modal = document.getElementById('gradeModal');
+        const submissionId = document.getElementById('gradingSubmissionId').value;
+        const score = parseInt(document.getElementById('gradeScore').value);
+        const feedback = document.getElementById('gradeFeedback').value.trim();
+        const errorEl = document.getElementById('gradeError');
+        const saveBtn = document.getElementById('saveGrade');
+        
+        errorEl.style.display = 'none';
+        
+        if (isNaN(score) || score < 0 || score > 100) {
+            errorEl.textContent = 'Please enter a score between 0 and 100';
+            errorEl.style.display = 'block';
+            return;
+        }
+        
+        try {
+            saveBtn.disabled = true;
+            saveBtn.textContent = 'Saving...';
+            
+            await FirebaseService.gradeSubmission(submissionId, score, feedback);
+            
+            modal.style.display = 'none';
+            
+            // Refresh submissions list
+            if (this.currentViewingAssignment) {
+                this.showSubmissionsModal(this.currentViewingAssignment);
+            }
+            
+        } catch (error) {
+            console.error('Save grade error:', error);
+            errorEl.textContent = 'Failed to save grade: ' + error.message;
+            errorEl.style.display = 'block';
+        } finally {
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'Save Grade';
+        }
+    }
+    
+    // Admin: Close assignment and determine winner
+    async closeAssignmentAndPickWinner() {
+        if (!this.currentViewingAssignment) return;
+        
+        const confirmClose = confirm(
+            'Are you sure you want to close this assignment and determine the winner?\n\n' +
+            'This action cannot be undone. The student with the highest score will be declared the winner.'
+        );
+        
+        if (!confirmClose) return;
+        
+        try {
+            const result = await FirebaseService.closeAssignmentAndDetermineWinner(this.currentViewingAssignment.id);
+            
+            document.getElementById('viewSubmissionsModal').style.display = 'none';
+            
+            // Show winner modal
+            this.showWinnerModal(result);
+            
+            // Refresh admin panel
+            this.showAdminAssignmentsPanel();
+            
+        } catch (error) {
+            console.error('Close assignment error:', error);
+            alert('Failed to close assignment: ' + error.message);
+        }
+    }
+    
+    // Show winner announcement
+    showWinnerModal(result) {
+        const modal = document.getElementById('winnerModal');
+        const details = document.getElementById('winnerDetails');
+        
+        if (result.winner) {
+            details.innerHTML = `
+                <div class="winner-name">🎉 ${result.winner.studentName}</div>
+                <div class="winner-score">Score: ${result.winner.score}/100</div>
+                <div class="winner-prize">
+                    <strong>Prize:</strong> ${result.assignment.prize}
+                </div>
+                <div class="winner-address">
+                    <h4>📬 Delivery Address:</h4>
+                    <p>${result.winner.address || 'No address provided'}</p>
+                </div>
+            `;
+        } else {
+            details.innerHTML = `
+                <p>No submissions were graded for this assignment.</p>
+            `;
+        }
+        
+        modal.style.display = 'flex';
     }
 }
 

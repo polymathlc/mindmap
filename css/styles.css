@@ -1131,3 +1131,459 @@ body {
     pointer-events: none;
     z-index: 1000;
 }
+
+/* ==========================================
+   ASSIGNMENTS & PROFILE STYLES
+   ========================================== */
+
+/* Side Panel */
+.side-panel {
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: 400px;
+    height: 100vh;
+    background: white;
+    box-shadow: -4px 0 20px rgba(0, 0, 0, 0.15);
+    z-index: 200;
+    display: flex;
+    flex-direction: column;
+    animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+    from { transform: translateX(100%); }
+    to { transform: translateX(0); }
+}
+
+.side-panel.admin-panel-large {
+    width: 500px;
+}
+
+.panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
+    border-bottom: 1px solid #e9ecef;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.panel-header h3 {
+    margin: 0;
+    font-size: 18px;
+}
+
+.close-panel-btn {
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    color: white;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+}
+
+.close-panel-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.panel-toolbar {
+    padding: 15px 20px;
+    border-bottom: 1px solid #e9ecef;
+    background: #f8f9fa;
+}
+
+/* Assignments List */
+#assignmentsList, #adminAssignmentsList {
+    flex: 1;
+    overflow-y: auto;
+    padding: 15px;
+}
+
+.assignment-card {
+    background: #f8f9fa;
+    border-radius: 12px;
+    padding: 15px;
+    margin-bottom: 12px;
+    border: 1px solid #e9ecef;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.assignment-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    border-color: #6c5ce7;
+}
+
+.assignment-card.completed {
+    opacity: 0.7;
+    border-left: 4px solid #28a745;
+}
+
+.assignment-card.submitted {
+    border-left: 4px solid #17a2b8;
+}
+
+.assignment-card h4 {
+    margin: 0 0 8px 0;
+    color: #333;
+    font-size: 16px;
+}
+
+.assignment-card .prize {
+    color: #f39c12;
+    font-weight: 600;
+    margin: 8px 0;
+}
+
+.assignment-card .deadline {
+    color: #dc3545;
+    font-size: 13px;
+}
+
+.assignment-card .deadline.soon {
+    color: #dc3545;
+    font-weight: 600;
+}
+
+.assignment-card .levels {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+    flex-wrap: wrap;
+}
+
+.level-badge {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.assignment-card .status-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    margin-top: 8px;
+}
+
+.status-badge.submitted {
+    background: #d1ecf1;
+    color: #0c5460;
+}
+
+.status-badge.graded {
+    background: #d4edda;
+    color: #155724;
+}
+
+.status-badge.active {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.status-badge.completed {
+    background: #d4edda;
+    color: #155724;
+}
+
+/* Assignment Detail Modal */
+.assignment-detail-content {
+    max-width: 500px;
+}
+
+.assignment-detail-content h2 {
+    margin: 0 0 15px 0;
+    color: #333;
+}
+
+.assignment-detail-content .prize-banner {
+    background: linear-gradient(135deg, #f39c12 0%, #e74c3c 100%);
+    color: white;
+    padding: 15px 20px;
+    border-radius: 10px;
+    margin: 15px 0;
+    text-align: center;
+}
+
+.assignment-detail-content .prize-banner h3 {
+    margin: 0;
+    font-size: 20px;
+}
+
+.assignment-detail-content .prize-banner p {
+    margin: 5px 0 0 0;
+    opacity: 0.9;
+    font-size: 14px;
+}
+
+.assignment-detail-content .deadline-banner {
+    background: #fff3cd;
+    color: #856404;
+    padding: 12px 15px;
+    border-radius: 8px;
+    margin: 15px 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.assignment-detail-content .action-buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+/* Checkbox Group for Levels */
+.checkbox-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.checkbox-group label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: #f8f9fa;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: 1px solid transparent;
+}
+
+.checkbox-group label:hover {
+    background: #e9ecef;
+}
+
+.checkbox-group input[type="checkbox"]:checked + span {
+    color: #6c5ce7;
+    font-weight: 600;
+}
+
+.checkbox-group label:has(input:checked) {
+    background: #e8e4ff;
+    border-color: #6c5ce7;
+}
+
+/* Submissions Modal */
+.submissions-modal-content {
+    max-width: 700px;
+    max-height: 80vh;
+}
+
+.submissions-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.submissions-header h3 {
+    margin: 0;
+}
+
+#submissionsList {
+    max-height: 50vh;
+    overflow-y: auto;
+}
+
+.submission-card {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    background: #f8f9fa;
+    border-radius: 10px;
+    padding: 15px;
+    margin-bottom: 10px;
+    border: 1px solid #e9ecef;
+}
+
+.submission-card .thumbnail {
+    width: 80px;
+    height: 60px;
+    background: #e9ecef;
+    border-radius: 6px;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+.submission-card .thumbnail img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.submission-card .info {
+    flex: 1;
+}
+
+.submission-card .student-name {
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 4px;
+}
+
+.submission-card .meta {
+    font-size: 12px;
+    color: #666;
+}
+
+.submission-card .score {
+    font-size: 24px;
+    font-weight: 700;
+    color: #6c5ce7;
+    min-width: 60px;
+    text-align: center;
+}
+
+.submission-card .score.not-graded {
+    color: #999;
+    font-size: 14px;
+}
+
+.submission-card .actions {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.submission-card .actions button {
+    padding: 6px 12px;
+    font-size: 12px;
+}
+
+/* Winner Modal */
+.winner-modal-content {
+    max-width: 450px;
+    text-align: center;
+}
+
+.winner-content {
+    padding: 20px;
+}
+
+.trophy-icon {
+    font-size: 64px;
+    margin-bottom: 15px;
+    animation: bounce 0.5s ease infinite alternate;
+}
+
+@keyframes bounce {
+    from { transform: translateY(0); }
+    to { transform: translateY(-10px); }
+}
+
+.winner-content h2 {
+    color: #333;
+    margin: 0 0 20px 0;
+}
+
+.winner-content .winner-name {
+    font-size: 24px;
+    font-weight: 700;
+    color: #6c5ce7;
+    margin: 10px 0;
+}
+
+.winner-content .winner-score {
+    font-size: 18px;
+    color: #28a745;
+    margin-bottom: 15px;
+}
+
+.winner-content .winner-prize {
+    background: linear-gradient(135deg, #f39c12 0%, #e74c3c 100%);
+    color: white;
+    padding: 15px 20px;
+    border-radius: 10px;
+    margin: 15px 0;
+}
+
+.winner-content .winner-address {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 8px;
+    text-align: left;
+    margin-top: 15px;
+}
+
+.winner-content .winner-address h4 {
+    margin: 0 0 8px 0;
+    color: #666;
+    font-size: 13px;
+}
+
+.winner-content .winner-address p {
+    margin: 0;
+    white-space: pre-line;
+}
+
+/* Assignments Button */
+.assignments-btn {
+    background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%) !important;
+    color: white !important;
+}
+
+.assignments-btn:hover {
+    opacity: 0.9;
+}
+
+.profile-btn {
+    background: #6c757d !important;
+    color: white !important;
+}
+
+/* Empty State */
+.empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: #666;
+}
+
+.empty-state .icon {
+    font-size: 48px;
+    margin-bottom: 15px;
+}
+
+.empty-state h4 {
+    margin: 0 0 8px 0;
+    color: #333;
+}
+
+.empty-state p {
+    margin: 0;
+    font-size: 14px;
+}
+
+/* Textarea in forms */
+.property-group textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 14px;
+    resize: vertical;
+}
+
+.property-group textarea:focus {
+    outline: none;
+    border-color: #6c5ce7;
+    box-shadow: 0 0 0 3px rgba(108, 92, 231, 0.1);
+}
