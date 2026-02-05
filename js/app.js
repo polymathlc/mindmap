@@ -83,6 +83,10 @@ class MindmapApp {
         // Line snapping settings
         this.lineSnapAngle = 8; // Snap to horizontal/vertical within 8 degrees
 
+        // Alignment snapping settings
+        this.snapThreshold = 8; // Pixels within which to snap
+        this.alignmentGuides = []; // Active alignment guides to draw
+
         // Initialize
         this.init();
     }
@@ -94,6 +98,7 @@ class MindmapApp {
         this.setupPropertyPanel();
         this.setupModals();
         this.setupAuth();
+        this.setupTutorial();
         this.saveState();
         this.render();
     }
@@ -163,8 +168,8 @@ class MindmapApp {
     handleMouseDown(e) {
         const pos = this.getMousePos(e);
 
-        // Middle mouse or space+click for panning
-        if (e.button === 1 || (e.button === 0 && e.shiftKey)) {
+        // Middle mouse for panning
+        if (e.button === 1) {
             this.isPanning = true;
             this.panStart = { x: e.clientX, y: e.clientY };
             this.canvas.style.cursor = 'grabbing';
@@ -210,11 +215,16 @@ class MindmapApp {
 
         if (clickedElement) {
             if (e.ctrlKey || e.metaKey) {
-                // Toggle selection
+                // Ctrl/Cmd+Click: Toggle selection
                 const idx = this.selectedElements.indexOf(clickedElement);
                 if (idx > -1) {
                     this.selectedElements.splice(idx, 1);
                 } else {
+                    this.selectedElements.push(clickedElement);
+                }
+            } else if (e.shiftKey) {
+                // Shift+Click: Add to selection (without toggle)
+                if (!this.selectedElements.includes(clickedElement)) {
                     this.selectedElements.push(clickedElement);
                 }
             } else if (!this.selectedElements.includes(clickedElement)) {
@@ -235,8 +245,8 @@ class MindmapApp {
                 y2: el.y2
             }));
         } else {
-            // Clicked on empty canvas - start panning
-            if (!e.ctrlKey && !e.metaKey) {
+            // Clicked on empty canvas
+            if (!e.ctrlKey && !e.metaKey && !e.shiftKey) {
                 this.selectedElements = [];
             }
             // Start panning on blank canvas
@@ -338,8 +348,14 @@ class MindmapApp {
         }
 
         if (this.isDragging) {
-            const dx = pos.x - this.dragOffset.x;
-            const dy = pos.y - this.dragOffset.y;
+            let dx = pos.x - this.dragOffset.x;
+            let dy = pos.y - this.dragOffset.y;
+
+            // Calculate alignment snapping
+            const draggedElements = this.dragStartPositions.map(p => p.element);
+            const snapped = this.calculateAlignmentSnapping(draggedElements, dx, dy);
+            dx = snapped.dx;
+            dy = snapped.dy;
 
             this.dragStartPositions.forEach(({ element, x, y, x2, y2 }) => {
                 element.x = x + dx;
@@ -409,7 +425,9 @@ class MindmapApp {
 
         if (this.isDragging) {
             this.isDragging = false;
+            this.alignmentGuides = []; // Clear alignment guides
             this.saveState();
+            this.render(); // Re-render to remove guides
             return;
         }
 
@@ -1028,6 +1046,188 @@ class MindmapApp {
         return { x: endX, y: endY };
     }
 
+    // Calculate alignment guides and snap positions for dragged elements
+    calculateAlignmentSnapping(draggedElements, dx, dy) {
+        this.alignmentGuides = [];
+        let snapDx = dx;
+        let snapDy = dy;
+
+        // Get the bounds of all selected elements combined
+        const selectedBounds = this.getCombinedBounds(draggedElements);
+        if (!selectedBounds) return { dx, dy };
+
+        // Calculate where the selected elements would be after the move
+        const projectedBounds = {
+            left: selectedBounds.left + dx,
+            right: selectedBounds.right + dx,
+            top: selectedBounds.top + dy,
+            bottom: selectedBounds.bottom + dy,
+            centerX: selectedBounds.centerX + dx,
+            centerY: selectedBounds.centerY + dy
+        };
+
+        // Get all non-selected elements to compare against
+        const otherElements = this.elements.filter(el =>
+            !draggedElements.includes(el) &&
+            el.type !== 'arrow' && el.type !== 'line'
+        );
+
+        // Collect all snap points from other elements
+        const snapPointsX = []; // { value, type, element }
+        const snapPointsY = [];
+
+        otherElements.forEach(el => {
+            const bounds = this.getElementBounds(el);
+            const left = bounds.x;
+            const right = bounds.x + bounds.width;
+            const top = bounds.y;
+            const bottom = bounds.y + bounds.height;
+            const centerX = bounds.x + bounds.width / 2;
+            const centerY = bounds.y + bounds.height / 2;
+
+            snapPointsX.push({ value: left, type: 'left', element: el });
+            snapPointsX.push({ value: right, type: 'right', element: el });
+            snapPointsX.push({ value: centerX, type: 'center', element: el });
+
+            snapPointsY.push({ value: top, type: 'top', element: el });
+            snapPointsY.push({ value: bottom, type: 'bottom', element: el });
+            snapPointsY.push({ value: centerY, type: 'center', element: el });
+        });
+
+        // Check horizontal alignments (X axis)
+        const selectedXPoints = [
+            { value: projectedBounds.left, type: 'left' },
+            { value: projectedBounds.right, type: 'right' },
+            { value: projectedBounds.centerX, type: 'center' }
+        ];
+
+        let bestSnapX = null;
+        let bestSnapXDist = this.snapThreshold;
+
+        selectedXPoints.forEach(selPoint => {
+            snapPointsX.forEach(snapPoint => {
+                const dist = Math.abs(selPoint.value - snapPoint.value);
+                if (dist < bestSnapXDist) {
+                    bestSnapXDist = dist;
+                    bestSnapX = {
+                        selectedType: selPoint.type,
+                        snapValue: snapPoint.value,
+                        snapType: snapPoint.type,
+                        element: snapPoint.element
+                    };
+                }
+            });
+        });
+
+        // Check vertical alignments (Y axis)
+        const selectedYPoints = [
+            { value: projectedBounds.top, type: 'top' },
+            { value: projectedBounds.bottom, type: 'bottom' },
+            { value: projectedBounds.centerY, type: 'center' }
+        ];
+
+        let bestSnapY = null;
+        let bestSnapYDist = this.snapThreshold;
+
+        selectedYPoints.forEach(selPoint => {
+            snapPointsY.forEach(snapPoint => {
+                const dist = Math.abs(selPoint.value - snapPoint.value);
+                if (dist < bestSnapYDist) {
+                    bestSnapYDist = dist;
+                    bestSnapY = {
+                        selectedType: selPoint.type,
+                        snapValue: snapPoint.value,
+                        snapType: snapPoint.type,
+                        element: snapPoint.element
+                    };
+                }
+            });
+        });
+
+        // Apply snapping and create guide lines
+        if (bestSnapX) {
+            const currentValue = selectedBounds[bestSnapX.selectedType === 'center' ? 'centerX' : bestSnapX.selectedType];
+            const adjustment = bestSnapX.snapValue - (currentValue + dx);
+            snapDx = dx + adjustment;
+
+            // Create vertical guide line
+            const snapElBounds = this.getElementBounds(bestSnapX.element);
+            this.alignmentGuides.push({
+                type: 'vertical',
+                x: bestSnapX.snapValue,
+                y1: Math.min(selectedBounds.top + snapDy, snapElBounds.y) - 20,
+                y2: Math.max(selectedBounds.bottom + snapDy, snapElBounds.y + snapElBounds.height) + 20
+            });
+        }
+
+        if (bestSnapY) {
+            const currentValue = selectedBounds[bestSnapY.selectedType === 'center' ? 'centerY' : bestSnapY.selectedType];
+            const adjustment = bestSnapY.snapValue - (currentValue + dy);
+            snapDy = dy + adjustment;
+
+            // Create horizontal guide line
+            const snapElBounds = this.getElementBounds(bestSnapY.element);
+            this.alignmentGuides.push({
+                type: 'horizontal',
+                y: bestSnapY.snapValue,
+                x1: Math.min(selectedBounds.left + snapDx, snapElBounds.x) - 20,
+                x2: Math.max(selectedBounds.right + snapDx, snapElBounds.x + snapElBounds.width) + 20
+            });
+        }
+
+        return { dx: snapDx, dy: snapDy };
+    }
+
+    // Get combined bounds of multiple elements
+    getCombinedBounds(elements) {
+        if (elements.length === 0) return null;
+
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+        elements.forEach(el => {
+            const bounds = this.getElementBounds(el);
+            minX = Math.min(minX, bounds.x);
+            minY = Math.min(minY, bounds.y);
+            maxX = Math.max(maxX, bounds.x + bounds.width);
+            maxY = Math.max(maxY, bounds.y + bounds.height);
+        });
+
+        return {
+            left: minX,
+            top: minY,
+            right: maxX,
+            bottom: maxY,
+            centerX: (minX + maxX) / 2,
+            centerY: (minY + maxY) / 2,
+            width: maxX - minX,
+            height: maxY - minY
+        };
+    }
+
+    // Draw alignment guide lines
+    drawAlignmentGuides() {
+        if (this.alignmentGuides.length === 0) return;
+
+        this.ctx.save();
+        this.ctx.strokeStyle = '#ff6b6b';
+        this.ctx.lineWidth = 1;
+        this.ctx.setLineDash([4, 4]);
+
+        this.alignmentGuides.forEach(guide => {
+            this.ctx.beginPath();
+            if (guide.type === 'vertical') {
+                this.ctx.moveTo(guide.x, guide.y1);
+                this.ctx.lineTo(guide.x, guide.y2);
+            } else {
+                this.ctx.moveTo(guide.x1, guide.y);
+                this.ctx.lineTo(guide.x2, guide.y);
+            }
+            this.ctx.stroke();
+        });
+
+        this.ctx.restore();
+    }
+
     // Rendering
     render() {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
@@ -1035,7 +1235,7 @@ class MindmapApp {
         // Apply devicePixelRatio scaling for retina displays
         this.ctx.save();
         this.ctx.scale(this.dpr, this.dpr);
-        
+
         // Apply pan and zoom
         this.ctx.translate(this.panOffset.x, this.panOffset.y);
         this.ctx.scale(this.zoom, this.zoom);
@@ -1057,6 +1257,9 @@ class MindmapApp {
         this.selectedElements.forEach(element => {
             this.drawSelectionIndicator(element);
         });
+
+        // Draw alignment guides (when dragging)
+        this.drawAlignmentGuides();
 
         this.ctx.restore();
     }
@@ -3437,11 +3640,11 @@ class MindmapApp {
         FirebaseService.onAuthStateChanged((user) => {
             if (user) {
                 const verified = user.emailVerified || user.email === ADMIN_EMAIL;
-                userStatus.innerHTML = user.email + (verified ? 
-                    '<span class="verified-badge">✓</span>' : 
+                userStatus.innerHTML = user.email + (verified ?
+                    '<span class="verified-badge">✓</span>' :
                     '<span class="unverified-badge">⚠ Unverified</span>');
                 signInBtn.textContent = 'Sign Out';
-                
+
                 // Show admin button if admin
                 if (FirebaseService.isAdmin()) {
                     adminBtn.style.display = 'inline-block';
@@ -3454,6 +3657,410 @@ class MindmapApp {
                 adminBtn.style.display = 'none';
             }
         });
+    }
+
+    // Tutorial System
+    setupTutorial() {
+        this.tutorialSteps = [
+            {
+                icon: '👋',
+                title: 'Welcome to Mindmap!',
+                content: `
+                    <p>This interactive tutorial will guide you through all the features of the Mindmap app. You'll learn how to create, edit, and organize your ideas visually.</p>
+                    <div class="highlight">
+                        <strong>What you'll learn:</strong>
+                        <ul style="margin: 10px 0 0 20px; color: #555;">
+                            <li>Creating and editing shapes</li>
+                            <li>Connecting ideas with arrows</li>
+                            <li>Multi-select and bulk editing</li>
+                            <li>Smart alignment and snapping</li>
+                            <li>Keyboard shortcuts for speed</li>
+                        </ul>
+                    </div>
+                    <div class="tip-box">
+                        <span class="tip-icon">💡</span>
+                        <p>You can access this tutorial anytime by clicking the <strong>Tutorial</strong> button in the toolbar.</p>
+                    </div>
+                `
+            },
+            {
+                icon: '🔷',
+                title: 'Creating Shapes',
+                content: `
+                    <p>The toolbar at the top contains all the shape tools you need to build your mindmap.</p>
+                    <div class="feature-grid">
+                        <div class="feature-card">
+                            <h4>▭ Rectangle</h4>
+                            <p>Great for main ideas and topics. Press <kbd>R</kbd> or click the button.</p>
+                        </div>
+                        <div class="feature-card">
+                            <h4>○ Circle</h4>
+                            <p>Perfect for central concepts. Press <kbd>C</kbd> or click the button.</p>
+                        </div>
+                        <div class="feature-card">
+                            <h4>◇ Diamond</h4>
+                            <p>Ideal for decision points. Press <kbd>D</kbd> or click the button.</p>
+                        </div>
+                        <div class="feature-card">
+                            <h4>△ Triangle</h4>
+                            <p>Use for hierarchy or warnings. Press <kbd>T</kbd> or click the button.</p>
+                        </div>
+                    </div>
+                    <div class="tip-box">
+                        <span class="tip-icon">💡</span>
+                        <p>Click anywhere on the canvas after selecting a tool to place a shape. Each shape gets a random pastel color!</p>
+                    </div>
+                `
+            },
+            {
+                icon: '✏️',
+                title: 'Adding Text to Shapes',
+                content: `
+                    <p>Adding text to your shapes is quick and intuitive. There are multiple ways to do it:</p>
+                    <div class="highlight">
+                        <strong>Method 1: Double-click</strong><br>
+                        Double-click on any shape to open the text editor.
+                    </div>
+                    <div class="highlight">
+                        <strong>Method 2: Direct typing</strong><br>
+                        Select a shape and just start typing! The text will appear immediately.
+                    </div>
+                    <div class="highlight">
+                        <strong>Method 3: Text Tool</strong><br>
+                        Press <kbd>X</kbd> to create a standalone text box without a shape.
+                    </div>
+                    <div class="tip-box">
+                        <span class="tip-icon">💡</span>
+                        <p>Text automatically wraps and resizes to fit within shapes. Press <kbd>Shift+Enter</kbd> for a new line, or <kbd>Enter</kbd> to finish editing.</p>
+                    </div>
+                `
+            },
+            {
+                icon: '🔗',
+                title: 'Connecting Shapes with Arrows',
+                content: `
+                    <p>Arrows help you show relationships between ideas. There are two ways to create connections:</p>
+                    <div class="highlight">
+                        <strong>Method 1: Arrow Connection Mode (Recommended)</strong><br>
+                        <ol style="margin: 10px 0 0 20px; color: #555;">
+                            <li>Press <kbd>A</kbd> to enter arrow mode</li>
+                            <li>Click on the source shape</li>
+                            <li>Click on the target shape</li>
+                        </ol>
+                        The arrow will automatically route around shapes!
+                    </div>
+                    <div class="highlight">
+                        <strong>Method 2: Drag from Connection Points</strong><br>
+                        Select a shape, then drag from any of the green dots to another shape.
+                    </div>
+                    <div class="tip-box">
+                        <span class="tip-icon">💡</span>
+                        <p>Press <kbd>Tab</kbd> on a selected shape to create a connected child shape. Press <kbd>Enter</kbd> to create a sibling below.</p>
+                    </div>
+                `
+            },
+            {
+                icon: '👆',
+                title: 'Selecting Elements',
+                content: `
+                    <p>Master selection to work efficiently with multiple elements at once.</p>
+                    <div class="shortcut-list">
+                        <div class="shortcut-item">
+                            <kbd>Click</kbd>
+                            <span>Select single element</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <kbd>Shift+Click</kbd>
+                            <span>Add to selection</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <kbd>Ctrl+Click</kbd>
+                            <span>Toggle selection</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <kbd>Ctrl+A</kbd>
+                            <span>Select all elements</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <kbd>Drag</kbd>
+                            <span>Selection box</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <kbd>Escape</kbd>
+                            <span>Deselect all</span>
+                        </div>
+                    </div>
+                    <div class="tip-box">
+                        <span class="tip-icon">💡</span>
+                        <p>When multiple shapes are selected, changing colors or stroke in the Properties panel applies to all of them at once!</p>
+                    </div>
+                `
+            },
+            {
+                icon: '🎯',
+                title: 'Smart Alignment & Snapping',
+                content: `
+                    <p>The app helps you create clean, aligned layouts automatically.</p>
+                    <div class="feature-grid">
+                        <div class="feature-card">
+                            <h4>📏 Alignment Guides</h4>
+                            <p>When you move shapes, dotted guide lines appear when edges or centers align with other shapes - just like PowerPoint!</p>
+                        </div>
+                        <div class="feature-card">
+                            <h4>🧲 Smart Snapping</h4>
+                            <p>Shapes snap to alignment guides automatically, making it easy to create organized layouts.</p>
+                        </div>
+                        <div class="feature-card">
+                            <h4>📐 Line Snapping</h4>
+                            <p>When drawing arrows or lines, they snap to horizontal or vertical when close to those angles.</p>
+                        </div>
+                        <div class="feature-card">
+                            <h4>⚖️ Proportional Resize</h4>
+                            <p>Hold <kbd>Shift</kbd> while resizing to maintain the shape's aspect ratio.</p>
+                        </div>
+                    </div>
+                `
+            },
+            {
+                icon: '🎨',
+                title: 'Customizing Appearance',
+                content: `
+                    <p>Make your mindmap visually appealing with colors and styles.</p>
+                    <div class="highlight">
+                        <strong>Toolbar Quick Colors</strong><br>
+                        Use the color pickers in the toolbar to set default colors for new shapes, or quickly change selected shapes.
+                    </div>
+                    <div class="highlight">
+                        <strong>Properties Panel (Right Side)</strong><br>
+                        When shapes are selected, the Properties panel shows:
+                        <ul style="margin: 10px 0 0 20px; color: #555;">
+                            <li>Text content and font size</li>
+                            <li>Font family selection</li>
+                            <li>Fill and stroke colors</li>
+                            <li>Stroke width</li>
+                            <li>Image position (for embedded images)</li>
+                        </ul>
+                    </div>
+                    <div class="tip-box">
+                        <span class="tip-icon">💡</span>
+                        <p>You can paste images into shapes! Just select a shape and press <kbd>Ctrl+V</kbd> with an image in your clipboard.</p>
+                    </div>
+                `
+            },
+            {
+                icon: '⌨️',
+                title: 'Keyboard Shortcuts',
+                content: `
+                    <p>Speed up your workflow with these essential shortcuts:</p>
+                    <div class="shortcut-list">
+                        <div class="shortcut-item">
+                            <kbd>V</kbd>
+                            <span>Select tool</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <kbd>R</kbd>
+                            <span>Rectangle</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <kbd>C</kbd>
+                            <span>Circle</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <kbd>D</kbd>
+                            <span>Diamond</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <kbd>T</kbd>
+                            <span>Triangle</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <kbd>A</kbd>
+                            <span>Arrow mode</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <kbd>L</kbd>
+                            <span>Line</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <kbd>X</kbd>
+                            <span>Text box</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <kbd>Del</kbd>
+                            <span>Delete selected</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <kbd>Ctrl+Z</kbd>
+                            <span>Undo</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <kbd>Ctrl+Y</kbd>
+                            <span>Redo</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <kbd>Ctrl+D</kbd>
+                            <span>Duplicate</span>
+                        </div>
+                    </div>
+                `
+            },
+            {
+                icon: '🖱️',
+                title: 'Navigation & View',
+                content: `
+                    <p>Navigate around large mindmaps with ease.</p>
+                    <div class="feature-grid">
+                        <div class="feature-card">
+                            <h4>🔍 Zoom</h4>
+                            <p>Use your mouse scroll wheel to zoom in and out. Zoom centers on your cursor position.</p>
+                        </div>
+                        <div class="feature-card">
+                            <h4>✋ Pan</h4>
+                            <p>Click and drag on empty canvas space to pan around. Or hold <kbd>Shift</kbd> while clicking.</p>
+                        </div>
+                        <div class="feature-card">
+                            <h4>🔄 Middle Mouse</h4>
+                            <p>Middle-click and drag also pans the canvas view.</p>
+                        </div>
+                        <div class="feature-card">
+                            <h4>↔️ Resize Shapes</h4>
+                            <p>Drag the square handles on selected shapes to resize them.</p>
+                        </div>
+                    </div>
+                    <div class="tip-box">
+                        <span class="tip-icon">💡</span>
+                        <p>The canvas is infinite! Pan and zoom to work on mindmaps of any size.</p>
+                    </div>
+                `
+            },
+            {
+                icon: '💾',
+                title: 'Saving & Sharing',
+                content: `
+                    <p>Save your work and share it with others.</p>
+                    <div class="feature-grid">
+                        <div class="feature-card">
+                            <h4>💾 Save Draft</h4>
+                            <p>Press <kbd>Ctrl+S</kbd> or click Save to store your mindmap in the cloud. Sign in required.</p>
+                        </div>
+                        <div class="feature-card">
+                            <h4>📂 Load Saved</h4>
+                            <p>Press <kbd>Ctrl+O</kbd> or click Saved Maps to load a previously saved mindmap.</p>
+                        </div>
+                        <div class="feature-card">
+                            <h4>📤 Submit</h4>
+                            <p>Click Submit to send your mindmap to your teacher for review.</p>
+                        </div>
+                        <div class="feature-card">
+                            <h4>📷 Export</h4>
+                            <p>Click Export to download your mindmap as a high-quality PNG image.</p>
+                        </div>
+                    </div>
+                    <div class="tip-box">
+                        <span class="tip-icon">💡</span>
+                        <p>Your mindmaps are automatically saved with thumbnails for easy preview!</p>
+                    </div>
+                `
+            },
+            {
+                icon: '🎉',
+                title: 'You\'re Ready!',
+                content: `
+                    <p>You now know everything you need to create amazing mindmaps!</p>
+                    <div class="highlight">
+                        <strong>Quick Reference:</strong>
+                        <ul style="margin: 10px 0 0 20px; color: #555;">
+                            <li><strong>Shapes:</strong> R, C, D, T keys or toolbar buttons</li>
+                            <li><strong>Connect:</strong> Press A, click source, click target</li>
+                            <li><strong>Multi-select:</strong> Shift+Click or Ctrl+Click</li>
+                            <li><strong>Edit text:</strong> Double-click or just start typing</li>
+                            <li><strong>Alignment:</strong> Automatic guides appear while moving</li>
+                            <li><strong>Navigate:</strong> Scroll to zoom, drag empty space to pan</li>
+                        </ul>
+                    </div>
+                    <div class="tip-box">
+                        <span class="tip-icon">🚀</span>
+                        <p>Start by pressing <kbd>R</kbd> to create a rectangle, type your main topic, then press <kbd>Tab</kbd> to create connected subtopics!</p>
+                    </div>
+                `
+            }
+        ];
+
+        this.currentTutorialStep = 0;
+
+        const tutorialBtn = document.getElementById('tutorialBtn');
+        const tutorialModal = document.getElementById('tutorialModal');
+        const closeTutorialModal = document.getElementById('closeTutorialModal');
+        const tutorialPrev = document.getElementById('tutorialPrev');
+        const tutorialNext = document.getElementById('tutorialNext');
+        const tutorialFinish = document.getElementById('tutorialFinish');
+
+        tutorialBtn.addEventListener('click', () => this.showTutorial());
+        closeTutorialModal.addEventListener('click', () => {
+            tutorialModal.style.display = 'none';
+        });
+
+        tutorialModal.addEventListener('click', (e) => {
+            if (e.target === tutorialModal) {
+                tutorialModal.style.display = 'none';
+            }
+        });
+
+        tutorialPrev.addEventListener('click', () => this.prevTutorialStep());
+        tutorialNext.addEventListener('click', () => this.nextTutorialStep());
+        tutorialFinish.addEventListener('click', () => {
+            tutorialModal.style.display = 'none';
+        });
+    }
+
+    showTutorial() {
+        this.currentTutorialStep = 0;
+        this.renderTutorialStep();
+        document.getElementById('tutorialModal').style.display = 'flex';
+    }
+
+    renderTutorialStep() {
+        const step = this.tutorialSteps[this.currentTutorialStep];
+        const content = document.getElementById('tutorialContent');
+        const indicator = document.getElementById('tutorialStepIndicator');
+        const progressBar = document.getElementById('tutorialProgressBar');
+        const prevBtn = document.getElementById('tutorialPrev');
+        const nextBtn = document.getElementById('tutorialNext');
+        const finishBtn = document.getElementById('tutorialFinish');
+
+        content.innerHTML = `
+            <div class="tutorial-step">
+                <h3><span class="step-icon">${step.icon}</span> ${step.title}</h3>
+                ${step.content}
+            </div>
+        `;
+
+        indicator.textContent = `Step ${this.currentTutorialStep + 1} of ${this.tutorialSteps.length}`;
+        progressBar.style.width = `${((this.currentTutorialStep + 1) / this.tutorialSteps.length) * 100}%`;
+
+        prevBtn.style.display = this.currentTutorialStep === 0 ? 'none' : 'inline-block';
+
+        if (this.currentTutorialStep === this.tutorialSteps.length - 1) {
+            nextBtn.style.display = 'none';
+            finishBtn.style.display = 'inline-block';
+        } else {
+            nextBtn.style.display = 'inline-block';
+            finishBtn.style.display = 'none';
+        }
+    }
+
+    prevTutorialStep() {
+        if (this.currentTutorialStep > 0) {
+            this.currentTutorialStep--;
+            this.renderTutorialStep();
+        }
+    }
+
+    nextTutorialStep() {
+        if (this.currentTutorialStep < this.tutorialSteps.length - 1) {
+            this.currentTutorialStep++;
+            this.renderTutorialStep();
+        }
     }
 }
 

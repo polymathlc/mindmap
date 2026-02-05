@@ -902,3 +902,193 @@ body {
     margin-top: 15px;
     font-weight: 500;
 }
+
+/* Tutorial button */
+.tutorial-btn {
+    background: linear-gradient(180deg, #6c5ce7 0%, #5849be 100%) !important;
+    border-color: #5849be !important;
+    color: #fff !important;
+}
+
+.tutorial-btn:hover {
+    background: linear-gradient(180deg, #7d6ef0 0%, #6c5ce7 100%) !important;
+}
+
+/* Tutorial Modal */
+.tutorial-modal-content {
+    max-width: 650px;
+    min-width: 500px;
+    max-height: 85vh;
+    position: relative;
+}
+
+#tutorialContent {
+    min-height: 350px;
+    padding: 10px 0;
+}
+
+.tutorial-step {
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.tutorial-step h3 {
+    color: #6c5ce7;
+    font-size: 20px;
+    margin-bottom: 15px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.tutorial-step h3 .step-icon {
+    font-size: 28px;
+}
+
+.tutorial-step p {
+    color: #555;
+    font-size: 14px;
+    line-height: 1.6;
+    margin-bottom: 12px;
+}
+
+.tutorial-step .highlight {
+    background: rgba(108, 92, 231, 0.1);
+    padding: 12px 15px;
+    border-radius: 8px;
+    border-left: 4px solid #6c5ce7;
+    margin: 15px 0;
+}
+
+.tutorial-step .shortcut-list {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    margin: 15px 0;
+}
+
+.tutorial-step .shortcut-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    background: #f8f9fa;
+    border-radius: 6px;
+    font-size: 13px;
+}
+
+.tutorial-step .shortcut-item kbd {
+    background: #e9ecef;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 12px;
+    color: #6c5ce7;
+    border: 1px solid #dee2e6;
+    min-width: 30px;
+    text-align: center;
+}
+
+.tutorial-step .feature-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    margin: 15px 0;
+}
+
+.tutorial-step .feature-card {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
+}
+
+.tutorial-step .feature-card h4 {
+    color: #333;
+    font-size: 14px;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.tutorial-step .feature-card p {
+    color: #666;
+    font-size: 12px;
+    margin: 0;
+    line-height: 1.4;
+}
+
+.tutorial-step .tip-box {
+    background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+    padding: 12px 15px;
+    border-radius: 8px;
+    margin: 15px 0;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+}
+
+.tutorial-step .tip-box .tip-icon {
+    font-size: 18px;
+}
+
+.tutorial-step .tip-box p {
+    margin: 0;
+    color: #155724;
+    font-size: 13px;
+}
+
+/* Tutorial Navigation */
+.tutorial-navigation {
+    border-top: 1px solid #e9ecef;
+    padding-top: 20px;
+    margin-top: 20px;
+}
+
+.tutorial-progress {
+    margin-bottom: 15px;
+}
+
+#tutorialStepIndicator {
+    font-size: 12px;
+    color: #666;
+    display: block;
+    margin-bottom: 8px;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 6px;
+    background: #e9ecef;
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #6c5ce7, #a29bfe);
+    border-radius: 3px;
+    transition: width 0.3s ease;
+}
+
+.tutorial-buttons {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.tutorial-buttons .action-btn {
+    min-width: 100px;
+}
+
+/* Alignment guide lines */
+.alignment-guide {
+    position: absolute;
+    pointer-events: none;
+    z-index: 1000;
+}

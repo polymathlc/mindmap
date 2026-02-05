@@ -54,6 +54,7 @@
                 <input type="range" id="strokeWidth" min="1" max="10" value="2">
             </div>
             <div class="toolbar-section actions">
+                <button id="tutorialBtn" class="action-btn tutorial-btn" title="Interactive Tutorial">❓ Tutorial</button>
                 <button id="saveBtn" class="action-btn" title="Save draft (Ctrl+S)">💾 Save</button>
                 <button id="loadBtn" class="action-btn" title="Load saved (Ctrl+O)">📂 Saved Maps</button>
                 <button id="submitBtn" class="action-btn submit-btn" title="Submit to teacher">📤 Submit</button>
@@ -82,6 +83,7 @@
                 <li><kbd>Tab</kbd> - Add child (next level)</li>
                 <li><kbd>Enter</kbd> - Add sibling (same level)</li>
                 <li><kbd>Delete</kbd> - Delete selected</li>
+                <li><kbd>Shift+Click</kbd> - Multi-select</li>
                 <li><kbd>Ctrl+C</kbd> - Copy</li>
                 <li><kbd>Ctrl+V</kbd> - Paste</li>
                 <li><kbd>Ctrl+Z</kbd> - Undo</li>
@@ -92,7 +94,7 @@
                 <li><kbd>Esc</kbd> - Deselect / Cancel</li>
             </ul>
             <p class="tip">Type directly on selected shape to edit text!</p>
-            <p class="tip">Drag from green dots to connect shapes!</p>
+            <p class="tip">Shapes snap to align with others!</p>
         </div>
 
         <!-- Canvas Container -->
@@ -313,6 +315,29 @@
             </div>
             <div id="adminMindmapList">
                 <p>Loading submissions...</p>
+            </div>
+        </div>
+
+        <!-- Tutorial Modal -->
+        <div id="tutorialModal" class="modal" style="display: none;">
+            <div class="modal-content tutorial-modal-content">
+                <button id="closeTutorialModal" class="close-modal-btn">&times;</button>
+                <div id="tutorialContent">
+                    <!-- Step content will be dynamically inserted here -->
+                </div>
+                <div class="tutorial-navigation">
+                    <div class="tutorial-progress">
+                        <span id="tutorialStepIndicator">Step 1 of 10</span>
+                        <div class="progress-bar">
+                            <div id="tutorialProgressBar" class="progress-fill"></div>
+                        </div>
+                    </div>
+                    <div class="tutorial-buttons">
+                        <button id="tutorialPrev" class="action-btn">Previous</button>
+                        <button id="tutorialNext" class="action-btn primary">Next</button>
+                        <button id="tutorialFinish" class="action-btn primary" style="display: none;">Get Started!</button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
