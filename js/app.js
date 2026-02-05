@@ -2603,7 +2603,7 @@ class MindmapApp {
         document.getElementById('clearBtn').addEventListener('click', () => this.clearCanvas());
         document.getElementById('exportBtn').addEventListener('click', () => this.exportAsPng());
 
-        // Emoji buttons
+        // Emoji buttons (in properties panel)
         document.querySelectorAll('.emoji-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 const emoji = btn.dataset.emoji;
@@ -2612,7 +2612,7 @@ class MindmapApp {
         });
     }
 
-    // Insert emoji into selected shape or create new text
+    // Insert emoji into selected shape's text
     insertEmoji(emoji) {
         if (this.selectedElements.length > 0) {
             // Add emoji to selected element's text
@@ -2624,29 +2624,12 @@ class MindmapApp {
             this.saveState();
             this.render();
             this.updatePropertyPanel();
-        } else {
-            // Create a new text element with the emoji
-            const centerX = (this.canvas.width / 2 - this.panOffset.x) / this.zoom;
-            const centerY = (this.canvas.height / 2 - this.panOffset.y) / this.zoom;
             
-            const textElement = {
-                type: 'text',
-                x: centerX - 20,
-                y: centerY - 15,
-                width: 40,
-                height: 30,
-                text: emoji,
-                fontSize: 24,
-                fillColor: 'transparent',
-                strokeColor: 'transparent',
-                strokeWidth: 0
-            };
-            
-            this.elements.push(textElement);
-            this.selectedElements = [textElement];
-            this.saveState();
-            this.render();
-            this.updatePropertyPanel();
+            // Update the text area to show the new text
+            const elementText = document.getElementById('elementText');
+            if (elementText && this.selectedElements.length === 1) {
+                elementText.value = this.selectedElements[0].text || '';
+            }
         }
     }
 

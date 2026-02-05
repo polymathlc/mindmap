@@ -88,27 +88,27 @@ body {
     width: 80px;
 }
 
-/* Emoji Toolbar */
-.toolbar-section.emojis {
-    background: rgba(255, 193, 7, 0.1);
-    padding: 5px 10px;
-    border-radius: 8px;
-    gap: 4px;
+/* Emoji in Properties Panel */
+.emoji-group {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #e0e0e0;
 }
 
-.emoji-label {
-    font-size: 11px;
-    color: #666;
-    margin-right: 4px;
+.emoji-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 6px;
+    margin-top: 8px;
 }
 
 .emoji-btn {
-    width: 32px;
-    height: 32px;
+    width: 36px;
+    height: 36px;
     font-size: 18px;
     background: white;
     border: 1px solid #e0e0e0;
-    border-radius: 6px;
+    border-radius: 8px;
     cursor: pointer;
     transition: all 0.2s;
     display: flex;
@@ -117,9 +117,14 @@ body {
 }
 
 .emoji-btn:hover {
-    transform: scale(1.15);
+    transform: scale(1.1);
     border-color: #6c5ce7;
-    box-shadow: 0 2px 8px rgba(108, 92, 231, 0.3);
+    background: #f0ebff;
+    box-shadow: 0 2px 8px rgba(108, 92, 231, 0.2);
+}
+
+.emoji-btn:active {
+    transform: scale(0.95);
 }
 
 .tool-btn {
