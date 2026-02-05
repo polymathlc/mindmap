@@ -88,6 +88,40 @@ body {
     width: 80px;
 }
 
+/* Emoji Toolbar */
+.toolbar-section.emojis {
+    background: rgba(255, 193, 7, 0.1);
+    padding: 5px 10px;
+    border-radius: 8px;
+    gap: 4px;
+}
+
+.emoji-label {
+    font-size: 11px;
+    color: #666;
+    margin-right: 4px;
+}
+
+.emoji-btn {
+    width: 32px;
+    height: 32px;
+    font-size: 18px;
+    background: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.emoji-btn:hover {
+    transform: scale(1.15);
+    border-color: #6c5ce7;
+    box-shadow: 0 2px 8px rgba(108, 92, 231, 0.3);
+}
+
 .tool-btn {
     display: flex;
     align-items: center;

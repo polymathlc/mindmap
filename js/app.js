@@ -2602,6 +2602,52 @@ class MindmapApp {
         document.getElementById('submitBtn').addEventListener('click', () => this.showSubmitModal());
         document.getElementById('clearBtn').addEventListener('click', () => this.clearCanvas());
         document.getElementById('exportBtn').addEventListener('click', () => this.exportAsPng());
+
+        // Emoji buttons
+        document.querySelectorAll('.emoji-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const emoji = btn.dataset.emoji;
+                this.insertEmoji(emoji);
+            });
+        });
+    }
+
+    // Insert emoji into selected shape or create new text
+    insertEmoji(emoji) {
+        if (this.selectedElements.length > 0) {
+            // Add emoji to selected element's text
+            this.selectedElements.forEach(el => {
+                if (el.text !== undefined) {
+                    el.text = (el.text || '') + emoji;
+                }
+            });
+            this.saveState();
+            this.render();
+            this.updatePropertyPanel();
+        } else {
+            // Create a new text element with the emoji
+            const centerX = (this.canvas.width / 2 - this.panOffset.x) / this.zoom;
+            const centerY = (this.canvas.height / 2 - this.panOffset.y) / this.zoom;
+            
+            const textElement = {
+                type: 'text',
+                x: centerX - 20,
+                y: centerY - 15,
+                width: 40,
+                height: 30,
+                text: emoji,
+                fontSize: 24,
+                fillColor: 'transparent',
+                strokeColor: 'transparent',
+                strokeWidth: 0
+            };
+            
+            this.elements.push(textElement);
+            this.selectedElements = [textElement];
+            this.saveState();
+            this.render();
+            this.updatePropertyPanel();
+        }
     }
 
     // Loading overlay
