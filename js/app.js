@@ -30,6 +30,9 @@ class MindmapApp {
         this.selectedConnection = null;
         this.isDraggingControlPoint = false;
         this.draggingControlPointIndex = -1;
+        this.isDraggingMiddleSegment = false;
+        this.dragStartPos = null;
+        this.dragStartControlPoints = null;
 
         // Pan and Zoom
         this.panOffset = { x: 0, y: 0 };
@@ -207,12 +210,33 @@ class MindmapApp {
             return;
         }
 
-        // Check if clicking on a connection control point
+        // Check if clicking on a connection control point or middle segment
         if (this.selectedConnection) {
             const controlPointIndex = this.getControlPointAtPosition(pos, this.selectedConnection);
             if (controlPointIndex >= 0) {
                 this.isDraggingControlPoint = true;
                 this.draggingControlPointIndex = controlPointIndex;
+                this.dragStartPos = { x: pos.x, y: pos.y };
+                return;
+            }
+            
+            // Check if clicking on the middle segment (for dragging both points)
+            const middleSegmentHit = this.isOnMiddleSegment(pos, this.selectedConnection);
+            if (middleSegmentHit) {
+                this.isDraggingMiddleSegment = true;
+                this.dragStartPos = { x: pos.x, y: pos.y };
+                // Initialize control points if not exist
+                if (!this.selectedConnection.controlPoints) {
+                    const path = this.getOrthogonalPath(this.selectedConnection.from, this.selectedConnection.to);
+                    this.selectedConnection.controlPoints = [
+                        { x: path[1].x, y: path[1].y },
+                        { x: path[2].x, y: path[2].y }
+                    ];
+                }
+                this.dragStartControlPoints = [
+                    { ...this.selectedConnection.controlPoints[0] },
+                    { ...this.selectedConnection.controlPoints[1] }
+                ];
                 return;
             }
         }
@@ -363,6 +387,33 @@ class MindmapApp {
             return;
         }
 
+        // Handle middle segment dragging (moves both control points while maintaining right angles)
+        if (this.isDraggingMiddleSegment && this.selectedConnection && this.dragStartControlPoints) {
+            const dx = pos.x - this.dragStartPos.x;
+            const dy = pos.y - this.dragStartPos.y;
+            
+            // Determine if this is a horizontal or vertical middle segment
+            const cp0 = this.dragStartControlPoints[0];
+            const cp1 = this.dragStartControlPoints[1];
+            
+            if (Math.abs(cp0.x - cp1.x) < 1) {
+                // Vertical middle segment - move both points horizontally
+                this.selectedConnection.controlPoints = [
+                    { x: cp0.x + dx, y: cp0.y },
+                    { x: cp1.x + dx, y: cp1.y }
+                ];
+            } else {
+                // Horizontal middle segment - move both points vertically
+                this.selectedConnection.controlPoints = [
+                    { x: cp0.x, y: cp0.y + dy },
+                    { x: cp1.x, y: cp1.y + dy }
+                ];
+            }
+            
+            this.render();
+            return;
+        }
+
         // Handle control point dragging for connections
         if (this.isDraggingControlPoint && this.selectedConnection) {
             // Initialize control points if not exist
@@ -374,8 +425,64 @@ class MindmapApp {
                 ];
             }
             
-            // Update the dragged control point
-            this.selectedConnection.controlPoints[this.draggingControlPointIndex] = { x: pos.x, y: pos.y };
+            // Move both control points together to maintain right angles
+            const dx = pos.x - this.dragStartPos.x;
+            const dy = pos.y - this.dragStartPos.y;
+            
+            // Get the original path to determine orientation
+            const path = this.selectedConnection._path;
+            if (path && path.length >= 4) {
+                // Check if dragging point is on a horizontal or vertical segment
+                if (this.draggingControlPointIndex === 0) {
+                    // First control point - affects first bend
+                    // Keep it aligned with the line from start
+                    if (Math.abs(path[0].y - path[1].y) < 1) {
+                        // Horizontal segment from start - only allow vertical movement
+                        this.selectedConnection.controlPoints[0] = { 
+                            x: this.selectedConnection.controlPoints[0].x, 
+                            y: pos.y 
+                        };
+                        this.selectedConnection.controlPoints[1] = { 
+                            x: this.selectedConnection.controlPoints[1].x, 
+                            y: pos.y 
+                        };
+                    } else {
+                        // Vertical segment from start - only allow horizontal movement
+                        this.selectedConnection.controlPoints[0] = { 
+                            x: pos.x, 
+                            y: this.selectedConnection.controlPoints[0].y 
+                        };
+                        this.selectedConnection.controlPoints[1] = { 
+                            x: pos.x, 
+                            y: this.selectedConnection.controlPoints[1].y 
+                        };
+                    }
+                } else {
+                    // Second control point - affects second bend
+                    if (Math.abs(path[3].y - path[2].y) < 1) {
+                        // Horizontal segment to end - only allow vertical movement
+                        this.selectedConnection.controlPoints[0] = { 
+                            x: this.selectedConnection.controlPoints[0].x, 
+                            y: pos.y 
+                        };
+                        this.selectedConnection.controlPoints[1] = { 
+                            x: this.selectedConnection.controlPoints[1].x, 
+                            y: pos.y 
+                        };
+                    } else {
+                        // Vertical segment to end - only allow horizontal movement
+                        this.selectedConnection.controlPoints[0] = { 
+                            x: pos.x, 
+                            y: this.selectedConnection.controlPoints[0].y 
+                        };
+                        this.selectedConnection.controlPoints[1] = { 
+                            x: pos.x, 
+                            y: this.selectedConnection.controlPoints[1].y 
+                        };
+                    }
+                }
+            }
+            
             this.render();
             return;
         }
@@ -445,10 +552,13 @@ class MindmapApp {
             return;
         }
 
-        // End control point dragging
-        if (this.isDraggingControlPoint) {
+        // End control point or middle segment dragging
+        if (this.isDraggingControlPoint || this.isDraggingMiddleSegment) {
             this.isDraggingControlPoint = false;
+            this.isDraggingMiddleSegment = false;
             this.draggingControlPointIndex = -1;
+            this.dragStartPos = null;
+            this.dragStartControlPoints = null;
             this.saveState();
             return;
         }
@@ -746,6 +856,16 @@ class MindmapApp {
             }
         }
         return -1;
+    }
+
+    // Check if position is on the middle segment of a connection
+    isOnMiddleSegment(pos, connection) {
+        if (!connection._path || connection._path.length < 4) return false;
+        
+        const path = connection._path;
+        // Middle segment is between path[1] and path[2]
+        const dist = this.distanceToLineSegment(pos, path[1], path[2]);
+        return dist < 8;
     }
 
     // Check if position is on a connection line
