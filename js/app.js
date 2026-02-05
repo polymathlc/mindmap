@@ -1046,170 +1046,10 @@ class MindmapApp {
         return { x: endX, y: endY };
     }
 
-    // Calculate alignment guides and snap positions for dragged elements
+    // Calculate alignment snapping - only snaps connected shapes to horizontal lines
     calculateAlignmentSnapping(draggedElements, dx, dy) {
         this.alignmentGuides = [];
-        let snapDx = dx;
         let snapDy = dy;
-
-        // Get the bounds of all selected elements combined
-        const selectedBounds = this.getCombinedBounds(draggedElements);
-        if (!selectedBounds) return { dx, dy };
-
-        // PRIORITY 1: Check for connection line snapping (horizontal/vertical alignment)
-        // This overrides general element alignment
-        const connectionSnap = this.calculateConnectionLineSnapping(draggedElements, dx, dy);
-        if (connectionSnap.snappedX || connectionSnap.snappedY) {
-            if (connectionSnap.snappedX) {
-                snapDx = connectionSnap.dx;
-                this.alignmentGuides.push(...connectionSnap.guidesX);
-            }
-            if (connectionSnap.snappedY) {
-                snapDy = connectionSnap.dy;
-                this.alignmentGuides.push(...connectionSnap.guidesY);
-            }
-            // If we have connection snaps, use them and skip general alignment for that axis
-            if (connectionSnap.snappedX && connectionSnap.snappedY) {
-                return { dx: snapDx, dy: snapDy };
-            }
-        }
-
-        // PRIORITY 2: General element alignment snapping (for axes not snapped by connections)
-        // Calculate where the selected elements would be after the move
-        const projectedBounds = {
-            left: selectedBounds.left + (connectionSnap.snappedX ? snapDx : dx),
-            right: selectedBounds.right + (connectionSnap.snappedX ? snapDx : dx),
-            top: selectedBounds.top + (connectionSnap.snappedY ? snapDy : dy),
-            bottom: selectedBounds.bottom + (connectionSnap.snappedY ? snapDy : dy),
-            centerX: selectedBounds.centerX + (connectionSnap.snappedX ? snapDx : dx),
-            centerY: selectedBounds.centerY + (connectionSnap.snappedY ? snapDy : dy)
-        };
-
-        // Get all non-selected elements to compare against
-        const otherElements = this.elements.filter(el =>
-            !draggedElements.includes(el) &&
-            el.type !== 'arrow' && el.type !== 'line'
-        );
-
-        // Collect all snap points from other elements
-        const snapPointsX = []; // { value, type, element }
-        const snapPointsY = [];
-
-        otherElements.forEach(el => {
-            const bounds = this.getElementBounds(el);
-            const left = bounds.x;
-            const right = bounds.x + bounds.width;
-            const top = bounds.y;
-            const bottom = bounds.y + bounds.height;
-            const centerX = bounds.x + bounds.width / 2;
-            const centerY = bounds.y + bounds.height / 2;
-
-            snapPointsX.push({ value: left, type: 'left', element: el });
-            snapPointsX.push({ value: right, type: 'right', element: el });
-            snapPointsX.push({ value: centerX, type: 'center', element: el });
-
-            snapPointsY.push({ value: top, type: 'top', element: el });
-            snapPointsY.push({ value: bottom, type: 'bottom', element: el });
-            snapPointsY.push({ value: centerY, type: 'center', element: el });
-        });
-
-        // Check horizontal alignments (X axis) - only if not already snapped by connection
-        if (!connectionSnap.snappedX) {
-            const selectedXPoints = [
-                { value: projectedBounds.left, type: 'left' },
-                { value: projectedBounds.right, type: 'right' },
-                { value: projectedBounds.centerX, type: 'center' }
-            ];
-
-            let bestSnapX = null;
-            let bestSnapXDist = this.snapThreshold;
-
-            selectedXPoints.forEach(selPoint => {
-                snapPointsX.forEach(snapPoint => {
-                    const dist = Math.abs(selPoint.value - snapPoint.value);
-                    if (dist < bestSnapXDist) {
-                        bestSnapXDist = dist;
-                        bestSnapX = {
-                            selectedType: selPoint.type,
-                            snapValue: snapPoint.value,
-                            snapType: snapPoint.type,
-                            element: snapPoint.element
-                        };
-                    }
-                });
-            });
-
-            if (bestSnapX) {
-                const currentValue = selectedBounds[bestSnapX.selectedType === 'center' ? 'centerX' : bestSnapX.selectedType];
-                const adjustment = bestSnapX.snapValue - (currentValue + dx);
-                snapDx = dx + adjustment;
-
-                // Create vertical guide line
-                const snapElBounds = this.getElementBounds(bestSnapX.element);
-                this.alignmentGuides.push({
-                    type: 'vertical',
-                    x: bestSnapX.snapValue,
-                    y1: Math.min(selectedBounds.top + snapDy, snapElBounds.y) - 20,
-                    y2: Math.max(selectedBounds.bottom + snapDy, snapElBounds.y + snapElBounds.height) + 20
-                });
-            }
-        }
-
-        // Check vertical alignments (Y axis) - only if not already snapped by connection
-        if (!connectionSnap.snappedY) {
-            const selectedYPoints = [
-                { value: projectedBounds.top, type: 'top' },
-                { value: projectedBounds.bottom, type: 'bottom' },
-                { value: projectedBounds.centerY, type: 'center' }
-            ];
-
-            let bestSnapY = null;
-            let bestSnapYDist = this.snapThreshold;
-
-            selectedYPoints.forEach(selPoint => {
-                snapPointsY.forEach(snapPoint => {
-                    const dist = Math.abs(selPoint.value - snapPoint.value);
-                    if (dist < bestSnapYDist) {
-                        bestSnapYDist = dist;
-                        bestSnapY = {
-                            selectedType: selPoint.type,
-                            snapValue: snapPoint.value,
-                            snapType: snapPoint.type,
-                            element: snapPoint.element
-                        };
-                    }
-                });
-            });
-
-            if (bestSnapY) {
-                const currentValue = selectedBounds[bestSnapY.selectedType === 'center' ? 'centerY' : bestSnapY.selectedType];
-                const adjustment = bestSnapY.snapValue - (currentValue + dy);
-                snapDy = dy + adjustment;
-
-                // Create horizontal guide line
-                const snapElBounds = this.getElementBounds(bestSnapY.element);
-                this.alignmentGuides.push({
-                    type: 'horizontal',
-                    y: bestSnapY.snapValue,
-                    x1: Math.min(selectedBounds.left + snapDx, snapElBounds.x) - 20,
-                    x2: Math.max(selectedBounds.right + snapDx, snapElBounds.x + snapElBounds.width) + 20
-                });
-            }
-        }
-
-        return { dx: snapDx, dy: snapDy };
-    }
-
-    // Calculate snapping to make connection lines horizontal or vertical (PRIORITY OVER ELEMENT ALIGNMENT)
-    calculateConnectionLineSnapping(draggedElements, dx, dy) {
-        const result = {
-            dx: dx,
-            dy: dy,
-            snappedX: false,
-            snappedY: false,
-            guidesX: [],
-            guidesY: []
-        };
 
         // Find all connections involving the dragged elements
         const relevantConnections = this.connections.filter(conn =>
@@ -1217,12 +1057,10 @@ class MindmapApp {
             (draggedElements.includes(conn.to) && !draggedElements.includes(conn.from))
         );
 
-        if (relevantConnections.length === 0) return result;
+        if (relevantConnections.length === 0) return { dx, dy };
 
         let bestHorizontalSnap = null;
-        let bestHorizontalDist = this.snapThreshold * 2; // Larger threshold for line snapping priority
-        let bestVerticalSnap = null;
-        let bestVerticalDist = this.snapThreshold * 2;
+        let bestHorizontalDist = this.snapThreshold * 2; // 16px threshold
 
         relevantConnections.forEach(conn => {
             const movingElement = draggedElements.includes(conn.from) ? conn.from : conn.to;
@@ -1232,11 +1070,9 @@ class MindmapApp {
             const staticBounds = this.getElementBounds(staticElement);
 
             // Calculate projected center of moving element
-            const movingCenterX = movingBounds.x + movingBounds.width / 2 + dx;
             const movingCenterY = movingBounds.y + movingBounds.height / 2 + dy;
 
             // Static element center
-            const staticCenterX = staticBounds.x + staticBounds.width / 2;
             const staticCenterY = staticBounds.y + staticBounds.height / 2;
 
             // Check if we can snap to make a horizontal connection line (same Y center)
@@ -1246,22 +1082,6 @@ class MindmapApp {
                 bestHorizontalSnap = {
                     targetY: staticCenterY,
                     currentY: movingBounds.y + movingBounds.height / 2,
-                    movingElement,
-                    staticElement,
-                    movingBounds,
-                    staticBounds
-                };
-            }
-
-            // Check if we can snap to make a vertical connection line (same X center)
-            const xDiff = Math.abs(movingCenterX - staticCenterX);
-            if (xDiff < bestVerticalDist) {
-                bestVerticalDist = xDiff;
-                bestVerticalSnap = {
-                    targetX: staticCenterX,
-                    currentX: movingBounds.x + movingBounds.width / 2,
-                    movingElement,
-                    staticElement,
                     movingBounds,
                     staticBounds
                 };
@@ -1271,38 +1091,19 @@ class MindmapApp {
         // Apply horizontal line snap (align Y centers for horizontal connection)
         if (bestHorizontalSnap) {
             const adjustment = bestHorizontalSnap.targetY - (bestHorizontalSnap.currentY + dy);
-            result.dy = dy + adjustment;
-            result.snappedY = true;
+            snapDy = dy + adjustment;
 
-            // Create guide line for horizontal connection alignment (green for connection guides)
-            result.guidesY.push({
+            // Create guide line for horizontal connection alignment
+            this.alignmentGuides.push({
                 type: 'horizontal',
                 y: bestHorizontalSnap.targetY,
-                x1: Math.min(bestHorizontalSnap.movingBounds.x + result.dx, bestHorizontalSnap.staticBounds.x) - 30,
-                x2: Math.max(bestHorizontalSnap.movingBounds.x + bestHorizontalSnap.movingBounds.width + result.dx,
-                           bestHorizontalSnap.staticBounds.x + bestHorizontalSnap.staticBounds.width) + 30,
-                isConnectionGuide: true
+                x1: Math.min(bestHorizontalSnap.movingBounds.x + dx, bestHorizontalSnap.staticBounds.x) - 30,
+                x2: Math.max(bestHorizontalSnap.movingBounds.x + bestHorizontalSnap.movingBounds.width + dx,
+                           bestHorizontalSnap.staticBounds.x + bestHorizontalSnap.staticBounds.width) + 30
             });
         }
 
-        // Apply vertical line snap (align X centers for vertical connection)
-        if (bestVerticalSnap) {
-            const adjustment = bestVerticalSnap.targetX - (bestVerticalSnap.currentX + dx);
-            result.dx = dx + adjustment;
-            result.snappedX = true;
-
-            // Create guide line for vertical connection alignment (green for connection guides)
-            result.guidesX.push({
-                type: 'vertical',
-                x: bestVerticalSnap.targetX,
-                y1: Math.min(bestVerticalSnap.movingBounds.y + result.dy, bestVerticalSnap.staticBounds.y) - 30,
-                y2: Math.max(bestVerticalSnap.movingBounds.y + bestVerticalSnap.movingBounds.height + result.dy,
-                           bestVerticalSnap.staticBounds.y + bestVerticalSnap.staticBounds.height) + 30,
-                isConnectionGuide: true
-            });
-        }
-
-        return result;
+        return { dx, dy: snapDy };
     }
 
     // Get combined bounds of multiple elements
@@ -1331,27 +1132,19 @@ class MindmapApp {
         };
     }
 
-    // Draw alignment guide lines
+    // Draw alignment guide lines (horizontal connection snapping)
     drawAlignmentGuides() {
         if (this.alignmentGuides.length === 0) return;
 
         this.ctx.save();
-        this.ctx.lineWidth = 1;
+        this.ctx.strokeStyle = '#00b894'; // Green for connection alignment
+        this.ctx.lineWidth = 2;
         this.ctx.setLineDash([4, 4]);
 
         this.alignmentGuides.forEach(guide => {
-            // Use green for connection guides (priority snapping), red for regular alignment
-            this.ctx.strokeStyle = guide.isConnectionGuide ? '#00b894' : '#ff6b6b';
-            this.ctx.lineWidth = guide.isConnectionGuide ? 2 : 1;
-
             this.ctx.beginPath();
-            if (guide.type === 'vertical') {
-                this.ctx.moveTo(guide.x, guide.y1);
-                this.ctx.lineTo(guide.x, guide.y2);
-            } else {
-                this.ctx.moveTo(guide.x1, guide.y);
-                this.ctx.lineTo(guide.x2, guide.y);
-            }
+            this.ctx.moveTo(guide.x1, guide.y);
+            this.ctx.lineTo(guide.x2, guide.y);
             this.ctx.stroke();
         });
 
@@ -2650,6 +2443,31 @@ class MindmapApp {
 
         elementText.addEventListener('change', () => {
             this.saveState();
+        });
+
+        // Emoji buttons - insert emoji into text
+        document.querySelectorAll('.emoji-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const emoji = btn.dataset.emoji;
+                if (this.selectedElements.length > 0) {
+                    // Insert emoji at cursor position in textarea, or append to text
+                    const cursorPos = elementText.selectionStart;
+                    const currentText = elementText.value;
+                    const newText = currentText.slice(0, cursorPos) + emoji + currentText.slice(cursorPos);
+
+                    elementText.value = newText;
+                    this.selectedElements.forEach(el => {
+                        el.text = newText;
+                    });
+
+                    // Set cursor position after emoji
+                    elementText.focus();
+                    elementText.selectionStart = elementText.selectionEnd = cursorPos + emoji.length;
+
+                    this.saveState();
+                    this.render();
+                }
+            });
         });
 
         elementFill.addEventListener('input', (e) => {
