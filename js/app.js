@@ -2445,6 +2445,31 @@ class MindmapApp {
             this.saveState();
         });
 
+        // Emoji buttons - insert emoji into text
+        document.querySelectorAll('.emoji-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const emoji = btn.dataset.emoji;
+                if (this.selectedElements.length > 0) {
+                    // Insert emoji at cursor position in textarea, or append to text
+                    const cursorPos = elementText.selectionStart;
+                    const currentText = elementText.value;
+                    const newText = currentText.slice(0, cursorPos) + emoji + currentText.slice(cursorPos);
+
+                    elementText.value = newText;
+                    this.selectedElements.forEach(el => {
+                        el.text = newText;
+                    });
+
+                    // Set cursor position after emoji
+                    elementText.focus();
+                    elementText.selectionStart = elementText.selectionEnd = cursorPos + emoji.length;
+
+                    this.saveState();
+                    this.render();
+                }
+            });
+        });
+
         elementFill.addEventListener('input', (e) => {
             this.selectedElements.forEach(el => {
                 el.fillColor = e.target.value;
