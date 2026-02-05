@@ -49,6 +49,21 @@ class MindmapApp {
         this.strokeColor = '#5DADE2';
         this.strokeWidth = 2;
         this.fontSize = 14;
+        this.fontFamily = 'Arial';
+
+        // Available font families
+        this.availableFonts = [
+            'Arial',
+            'Helvetica',
+            'Roboto',
+            'Century Gothic',
+            'Calibri',
+            'Georgia',
+            'Times New Roman',
+            'Verdana',
+            'Trebuchet MS',
+            'Comic Sans MS'
+        ];
 
         // Default shape sizes
         this.defaultWidth = 120;
@@ -64,6 +79,9 @@ class MindmapApp {
 
         // Temp drawing element
         this.tempElement = null;
+
+        // Line snapping settings
+        this.lineSnapAngle = 8; // Snap to horizontal/vertical within 8 degrees
 
         // Initialize
         this.init();
@@ -899,6 +917,7 @@ class MindmapApp {
             strokeWidth: this.strokeWidth,
             text: '',
             fontSize: this.fontSize,
+            fontFamily: this.fontFamily,
             textAlign: 'center'
         };
 
@@ -937,8 +956,13 @@ class MindmapApp {
         const type = this.tempElement.type;
 
         if (type === 'arrow' || type === 'line') {
-            this.tempElement.x2 = pos.x;
-            this.tempElement.y2 = pos.y;
+            // Apply line snapping for straight lines
+            const snapped = this.snapLineEndpoint(
+                this.tempElement.x, this.tempElement.y,
+                pos.x, pos.y
+            );
+            this.tempElement.x2 = snapped.x;
+            this.tempElement.y2 = snapped.y;
         } else {
             this.tempElement.x = Math.min(this.drawStart.x, pos.x);
             this.tempElement.y = Math.min(this.drawStart.y, pos.y);
@@ -983,6 +1007,25 @@ class MindmapApp {
             x: bounds.x + bounds.width / 2,
             y: bounds.y + bounds.height / 2
         };
+    }
+
+    // Snap line endpoint to horizontal or vertical if within threshold angle
+    snapLineEndpoint(startX, startY, endX, endY) {
+        const dx = endX - startX;
+        const dy = endY - startY;
+        const angle = Math.abs(Math.atan2(dy, dx) * 180 / Math.PI);
+        const snapThreshold = this.lineSnapAngle;
+
+        // Snap to horizontal (0 or 180 degrees)
+        if (angle <= snapThreshold || angle >= 180 - snapThreshold) {
+            return { x: endX, y: startY };
+        }
+        // Snap to vertical (90 degrees)
+        if (Math.abs(angle - 90) <= snapThreshold) {
+            return { x: startX, y: endY };
+        }
+        // No snap
+        return { x: endX, y: endY };
     }
 
     // Rendering
@@ -1149,10 +1192,10 @@ class MindmapApp {
     }
 
     // Wrap text to fit within a given width
-    wrapText(text, maxWidth, fontSize, ctx) {
+    wrapText(text, maxWidth, fontSize, ctx, fontFamily = 'Arial') {
         if (!text) return [];
 
-        const font = `${fontSize}px -apple-system, BlinkMacSystemFont, sans-serif`;
+        const font = `${fontSize}px "${fontFamily}", -apple-system, BlinkMacSystemFont, sans-serif`;
         ctx.font = font;
 
         const paragraphs = text.split('\n');
@@ -1189,7 +1232,7 @@ class MindmapApp {
 
     // Calculate optimal font size to fit text within shape bounds
     // Strategy: first wrap text, then reduce font size if needed to fit height
-    calculateOptimalFontSize(text, maxWidth, maxHeight, baseFontSize, ctx, padding = 10) {
+    calculateOptimalFontSize(text, maxWidth, maxHeight, baseFontSize, ctx, padding = 10, fontFamily = 'Arial') {
         if (!text) return { fontSize: baseFontSize, lines: [] };
 
         const minFontSize = 8;
@@ -1201,7 +1244,7 @@ class MindmapApp {
         const availableHeight = maxHeight - padding * 2;
 
         while (fontSize >= minFontSize) {
-            const lines = this.wrapText(text, availableWidth, fontSize, ctx);
+            const lines = this.wrapText(text, availableWidth, fontSize, ctx, fontFamily);
             const totalTextHeight = lines.length * fontSize * lineHeightRatio;
 
             if (totalTextHeight <= availableHeight) {
@@ -1212,18 +1255,18 @@ class MindmapApp {
         }
 
         // Return minimum font size even if it doesn't fit perfectly
-        const lines = this.wrapText(text, availableWidth, minFontSize, ctx);
+        const lines = this.wrapText(text, availableWidth, minFontSize, ctx, fontFamily);
         return { fontSize: minFontSize, lines };
     }
 
     // Render text with crisp quality at any zoom level
     // This renders text outside the zoom transform for pixel-perfect clarity
-    renderCrispText(lines, centerX, centerY, fontSize, maxHeight, padding = 10) {
+    renderCrispText(lines, centerX, centerY, fontSize, maxHeight, padding = 10, fontFamily = 'Arial') {
         if (lines.length === 0) return;
 
         // Get current DPR (default to 1 for export context)
         const dpr = this.dpr || 1;
-        
+
         // Calculate screen-space coordinates with DPR
         const screenX = (centerX * this.zoom + this.panOffset.x) * dpr;
         const screenY = (centerY * this.zoom + this.panOffset.y) * dpr;
@@ -1236,7 +1279,7 @@ class MindmapApp {
 
         // Set text properties with scaled font size
         this.ctx.fillStyle = '#333333';
-        this.ctx.font = `600 ${screenFontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
+        this.ctx.font = `600 ${screenFontSize}px "${fontFamily}", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
         this.ctx.textAlign = 'center';
         this.ctx.textBaseline = 'middle';
 
@@ -1253,14 +1296,14 @@ class MindmapApp {
     }
 
     drawText(element) {
-        const { x, y, width, height, text, fontSize } = element;
+        const { x, y, width, height, text, fontSize, fontFamily } = element;
 
         // Draw background if has fill color (not transparent)
         if (element.fillColor && element.fillColor !== 'transparent') {
             this.ctx.fillStyle = element.fillColor;
             this.ctx.fillRect(x, y, width, height);
         }
-        
+
         // Draw border if has stroke color (not transparent)
         if (element.strokeColor && element.strokeColor !== 'transparent' && element.strokeWidth > 0) {
             this.ctx.strokeStyle = element.strokeColor;
@@ -1272,16 +1315,17 @@ class MindmapApp {
         if (text) {
             const baseFontSize = fontSize || 16;
             const padding = 4;
+            const font = fontFamily || 'Arial';
 
             // Calculate optimal font size with text wrapping
             const { fontSize: optimalFontSize, lines } = this.calculateOptimalFontSize(
-                text, width, height, baseFontSize, this.ctx, padding
+                text, width, height, baseFontSize, this.ctx, padding, font
             );
 
             // Render crisp text at center of element
             const centerX = x + width / 2;
             const centerY = y + height / 2;
-            this.renderCrispText(lines, centerX, centerY, optimalFontSize, height, padding);
+            this.renderCrispText(lines, centerX, centerY, optimalFontSize, height, padding, font);
         }
     }
 
@@ -1301,6 +1345,7 @@ class MindmapApp {
         const width = element.width || 0;
         const height = element.height || 0;
         const baseFontSize = element.fontSize || 14;
+        const fontFamily = element.fontFamily || 'Arial';
 
         // Calculate padding based on shape type
         let padding = 10;
@@ -1322,17 +1367,17 @@ class MindmapApp {
 
         // Calculate optimal font size with text wrapping
         const { fontSize: optimalFontSize, lines } = this.calculateOptimalFontSize(
-            element.text, width, height, baseFontSize, this.ctx, padding, element.embeddedImage
+            element.text, width, height, baseFontSize, this.ctx, padding, fontFamily
         );
 
         // Adjust text position based on image position
         let centerX = element.x + width / 2;
         let centerY = element.y + height / 2;
-        
+
         if (element.embeddedImage) {
             const imgPos = element.embeddedImage.position || 'bottom';
             const imgHeight = this.getEmbeddedImageDimensions(element, padding).height;
-            
+
             if (imgPos === 'bottom') {
                 centerY = element.y + (height - imgHeight - padding) / 2 + padding / 2;
             } else if (imgPos === 'top') {
@@ -1348,7 +1393,7 @@ class MindmapApp {
             }
         }
 
-        this.renderCrispText(lines, centerX, centerY, optimalFontSize, height, padding);
+        this.renderCrispText(lines, centerX, centerY, optimalFontSize, height, padding, fontFamily);
     }
 
     // Get embedded image dimensions scaled to fit shape
@@ -1579,11 +1624,15 @@ class MindmapApp {
 
         if (element.type === 'arrow' || element.type === 'line') {
             if (handle.type === 'start') {
-                element.x = pos.x;
-                element.y = pos.y;
+                // Snap start point relative to end point
+                const snapped = this.snapLineEndpoint(element.x2, element.y2, pos.x, pos.y);
+                element.x = snapped.x;
+                element.y = snapped.y;
             } else {
-                element.x2 = pos.x;
-                element.y2 = pos.y;
+                // Snap end point relative to start point
+                const snapped = this.snapLineEndpoint(element.x, element.y, pos.x, pos.y);
+                element.x2 = snapped.x;
+                element.y2 = snapped.y;
             }
             return;
         }
@@ -2314,6 +2363,16 @@ class MindmapApp {
             this.saveState();
         });
 
+        // Font family selector
+        const elementFontFamily = document.getElementById('elementFontFamily');
+        elementFontFamily.addEventListener('change', (e) => {
+            this.selectedElements.forEach(el => {
+                el.fontFamily = e.target.value;
+            });
+            this.saveState();
+            this.render();
+        });
+
         deleteBtn.addEventListener('click', () => {
             this.deleteSelected();
         });
@@ -2386,6 +2445,7 @@ class MindmapApp {
         document.getElementById('elementStroke').value = element.strokeColor || '#5DADE2';
         document.getElementById('elementStrokeWidth').value = element.strokeWidth || 2;
         document.getElementById('elementFontSize').value = element.fontSize || 14;
+        document.getElementById('elementFontFamily').value = element.fontFamily || 'Arial';
 
         // Show/hide image position controls
         if (element.embeddedImage && imagePositionGroup) {
