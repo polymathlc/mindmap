@@ -26,6 +26,11 @@ class MindmapApp {
         this.isArrowConnectionMode = false;
         this.arrowConnectionOrigin = null;
 
+        // Connection editing
+        this.selectedConnection = null;
+        this.isDraggingControlPoint = false;
+        this.draggingControlPointIndex = -1;
+
         // Pan and Zoom
         this.panOffset = { x: 0, y: 0 };
         this.zoom = 1;
@@ -202,6 +207,26 @@ class MindmapApp {
             return;
         }
 
+        // Check if clicking on a connection control point
+        if (this.selectedConnection) {
+            const controlPointIndex = this.getControlPointAtPosition(pos, this.selectedConnection);
+            if (controlPointIndex >= 0) {
+                this.isDraggingControlPoint = true;
+                this.draggingControlPointIndex = controlPointIndex;
+                return;
+            }
+        }
+
+        // Check if clicking on a connection line
+        const clickedConnection = this.getConnectionAtPosition(pos);
+        if (clickedConnection) {
+            this.selectedConnection = clickedConnection;
+            this.selectedElements = [];
+            this.updatePropertyPanel();
+            this.render();
+            return;
+        }
+
         // Check if clicking on a connection point
         const connectionPoint = this.getConnectionPointAtPosition(pos);
         if (connectionPoint) {
@@ -214,6 +239,9 @@ class MindmapApp {
         const clickedElement = this.getElementAtPosition(pos);
 
         if (clickedElement) {
+            // Clear connection selection when clicking on element
+            this.selectedConnection = null;
+            
             if (e.ctrlKey || e.metaKey) {
                 // Ctrl/Cmd+Click: Toggle selection
                 const idx = this.selectedElements.indexOf(clickedElement);
@@ -248,6 +276,7 @@ class MindmapApp {
             // Clicked on empty canvas
             if (!e.ctrlKey && !e.metaKey && !e.shiftKey) {
                 this.selectedElements = [];
+                this.selectedConnection = null;
             }
             // Start panning on blank canvas
             this.isPanning = true;
@@ -334,6 +363,23 @@ class MindmapApp {
             return;
         }
 
+        // Handle control point dragging for connections
+        if (this.isDraggingControlPoint && this.selectedConnection) {
+            // Initialize control points if not exist
+            if (!this.selectedConnection.controlPoints) {
+                const path = this.getOrthogonalPath(this.selectedConnection.from, this.selectedConnection.to);
+                this.selectedConnection.controlPoints = [
+                    { x: path[1].x, y: path[1].y },
+                    { x: path[2].x, y: path[2].y }
+                ];
+            }
+            
+            // Update the dragged control point
+            this.selectedConnection.controlPoints[this.draggingControlPointIndex] = { x: pos.x, y: pos.y };
+            this.render();
+            return;
+        }
+
         if (this.isConnecting && this.connectionStart) {
             this.render();
             // Draw temporary connection line
@@ -396,6 +442,14 @@ class MindmapApp {
         if (this.isPanning) {
             this.isPanning = false;
             this.canvas.style.cursor = this.currentTool === 'select' ? 'default' : 'crosshair';
+            return;
+        }
+
+        // End control point dragging
+        if (this.isDraggingControlPoint) {
+            this.isDraggingControlPoint = false;
+            this.draggingControlPointIndex = -1;
+            this.saveState();
             return;
         }
 
@@ -532,7 +586,7 @@ class MindmapApp {
     }
 
     // Get orthogonal path between two elements (Z-shaped arrow)
-    getOrthogonalPath(fromElement, toElement) {
+    getOrthogonalPath(fromElement, toElement, connection = null) {
         const fromCenter = this.getElementCenter(fromElement);
         const toCenter = this.getElementCenter(toElement);
         const fromBounds = this.getElementBounds(fromElement);
@@ -558,14 +612,24 @@ class MindmapApp {
                 endPoint = { x: toBounds.x + toBounds.width, y: toCenter.y };
             }
 
-            // Create Z-path (horizontal -> vertical -> horizontal)
-            const midX = (startPoint.x + endPoint.x) / 2;
-            path = [
-                startPoint,
-                { x: midX, y: startPoint.y },
-                { x: midX, y: endPoint.y },
-                endPoint
-            ];
+            // Use custom control points if they exist, otherwise calculate default
+            if (connection && connection.controlPoints && connection.controlPoints.length === 2) {
+                path = [
+                    startPoint,
+                    connection.controlPoints[0],
+                    connection.controlPoints[1],
+                    endPoint
+                ];
+            } else {
+                // Create Z-path (horizontal -> vertical -> horizontal)
+                const midX = (startPoint.x + endPoint.x) / 2;
+                path = [
+                    startPoint,
+                    { x: midX, y: startPoint.y },
+                    { x: midX, y: endPoint.y },
+                    endPoint
+                ];
+            }
         } else {
             // Vertical dominant - connect top/bottom sides
             if (dy > 0) {
@@ -578,21 +642,31 @@ class MindmapApp {
                 endPoint = { x: toCenter.x, y: toBounds.y + toBounds.height };
             }
 
-            // Create Z-path (vertical -> horizontal -> vertical)
-            const midY = (startPoint.y + endPoint.y) / 2;
-            path = [
-                startPoint,
-                { x: startPoint.x, y: midY },
-                { x: endPoint.x, y: midY },
-                endPoint
-            ];
+            // Use custom control points if they exist, otherwise calculate default
+            if (connection && connection.controlPoints && connection.controlPoints.length === 2) {
+                path = [
+                    startPoint,
+                    connection.controlPoints[0],
+                    connection.controlPoints[1],
+                    endPoint
+                ];
+            } else {
+                // Create Z-path (vertical -> horizontal -> vertical)
+                const midY = (startPoint.y + endPoint.y) / 2;
+                path = [
+                    startPoint,
+                    { x: startPoint.x, y: midY },
+                    { x: endPoint.x, y: midY },
+                    endPoint
+                ];
+            }
         }
 
         return path;
     }
 
-    drawConnection(connection) {
-        const path = this.getOrthogonalPath(connection.from, connection.to);
+    drawConnection(connection, showControlPoints = false) {
+        const path = this.getOrthogonalPath(connection.from, connection.to, connection);
 
         if (path.length < 2) return;
 
@@ -615,7 +689,29 @@ class MindmapApp {
         const prevPoint = path[path.length - 2];
         this.drawArrowhead(prevPoint, lastPoint);
 
+        // Draw control points (yellow dots) at the middle points
+        if (showControlPoints && path.length >= 4) {
+            // Control point 1 (second point in path)
+            this.ctx.fillStyle = '#FFD700';
+            this.ctx.strokeStyle = '#B8860B';
+            this.ctx.lineWidth = 2;
+            
+            this.ctx.beginPath();
+            this.ctx.arc(path[1].x, path[1].y, 6, 0, Math.PI * 2);
+            this.ctx.fill();
+            this.ctx.stroke();
+            
+            // Control point 2 (third point in path)
+            this.ctx.beginPath();
+            this.ctx.arc(path[2].x, path[2].y, 6, 0, Math.PI * 2);
+            this.ctx.fill();
+            this.ctx.stroke();
+        }
+
         this.ctx.restore();
+        
+        // Store path for hit testing
+        connection._path = path;
     }
 
     drawArrowhead(from, to) {
@@ -634,6 +730,62 @@ class MindmapApp {
             to.y - headLength * Math.sin(angle + Math.PI / 6)
         );
         this.ctx.stroke();
+    }
+
+    // Check if position is on a control point of a connection
+    getControlPointAtPosition(pos, connection) {
+        if (!connection._path || connection._path.length < 4) return -1;
+        
+        const path = connection._path;
+        // Control points are at index 1 and 2 in the path
+        for (let i = 1; i <= 2; i++) {
+            const point = path[i];
+            const dist = Math.sqrt(Math.pow(pos.x - point.x, 2) + Math.pow(pos.y - point.y, 2));
+            if (dist < 10) {
+                return i - 1; // Return 0 or 1 for control point index
+            }
+        }
+        return -1;
+    }
+
+    // Check if position is on a connection line
+    getConnectionAtPosition(pos) {
+        for (let connection of this.connections) {
+            if (!connection._path || connection._path.length < 2) continue;
+            
+            const path = connection._path;
+            // Check each segment of the path
+            for (let i = 0; i < path.length - 1; i++) {
+                const p1 = path[i];
+                const p2 = path[i + 1];
+                
+                // Calculate distance from point to line segment
+                const dist = this.distanceToLineSegment(pos, p1, p2);
+                if (dist < 8) {
+                    return connection;
+                }
+            }
+        }
+        return null;
+    }
+
+    // Calculate distance from point to line segment
+    distanceToLineSegment(point, lineStart, lineEnd) {
+        const dx = lineEnd.x - lineStart.x;
+        const dy = lineEnd.y - lineStart.y;
+        const lengthSquared = dx * dx + dy * dy;
+        
+        if (lengthSquared === 0) {
+            return Math.sqrt(Math.pow(point.x - lineStart.x, 2) + Math.pow(point.y - lineStart.y, 2));
+        }
+        
+        let t = ((point.x - lineStart.x) * dx + (point.y - lineStart.y) * dy) / lengthSquared;
+        t = Math.max(0, Math.min(1, t));
+        
+        const nearestX = lineStart.x + t * dx;
+        const nearestY = lineStart.y + t * dy;
+        
+        return Math.sqrt(Math.pow(point.x - nearestX, 2) + Math.pow(point.y - nearestY, 2));
     }
 
     getConnectionPointAtPosition(pos) {
@@ -1406,7 +1558,8 @@ class MindmapApp {
         this.connections.forEach(connection => {
             // Check if both elements still exist
             if (this.elements.includes(connection.from) && this.elements.includes(connection.to)) {
-                this.drawConnection(connection);
+                const isSelected = connection === this.selectedConnection;
+                this.drawConnection(connection, isSelected);
             }
         });
 
