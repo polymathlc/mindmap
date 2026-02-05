@@ -2207,31 +2207,43 @@ class MindmapApp {
         return new Promise((resolve, reject) => {
             const img = new Image();
             
-            const tryLoad = (src) => {
+            const tryLoad = (src, withCors = false) => {
                 if (!src) {
                     reject(new Error('No image source'));
                     return;
                 }
                 
-                img.onload = () => resolve(img);
-                img.onerror = () => {
-                    // If primary failed and we have a fallback, try it
+                // Create fresh image for each attempt
+                const testImg = new Image();
+                
+                testImg.onload = () => resolve(testImg);
+                testImg.onerror = () => {
+                    // If failed with CORS, try without CORS
+                    if (withCors && src.includes('firebasestorage.googleapis.com')) {
+                        console.log('Retrying without CORS...');
+                        tryLoad(src, false);
+                        return;
+                    }
+                    // If primary failed, try fallback
                     if (src === primarySrc && fallbackUrl && fallbackUrl !== primarySrc) {
                         console.log('Primary image failed, trying fallback URL');
-                        tryLoad(fallbackUrl);
+                        tryLoad(fallbackUrl, false);
                     } else {
                         reject(new Error('Failed to load image'));
                     }
                 };
                 
-                // Only set crossOrigin for http URLs
-                if (src.startsWith('http')) {
-                    img.crossOrigin = 'anonymous';
+                // Don't set crossOrigin for Firebase Storage URLs - they have signed tokens
+                // Also don't set for data URLs (base64)
+                if (withCors && src.startsWith('http') && !src.includes('firebasestorage.googleapis.com')) {
+                    testImg.crossOrigin = 'anonymous';
                 }
-                img.src = src;
+                testImg.src = src;
             };
             
-            tryLoad(primarySrc);
+            // Try without CORS first for Firebase URLs
+            const isFirebase = primarySrc && primarySrc.includes('firebasestorage.googleapis.com');
+            tryLoad(primarySrc, !isFirebase);
         });
     }
 
@@ -3366,15 +3378,19 @@ class MindmapApp {
             // Handle embedded images in shapes
             if (el.embeddedImage) {
                 const imgSrc = el.embeddedImage.data || el.embeddedImage.url;
+                console.log('Loading embedded image:', imgSrc ? imgSrc.substring(0, 80) + '...' : 'NO SOURCE');
                 if (imgSrc) {
                     pendingImages++;
                     this.loadImageWithFallback(imgSrc, el.embeddedImage.url).then(img => {
+                        console.log('✅ Embedded image loaded successfully');
                         el.embeddedImage.image = img;
                         checkRender();
                     }).catch(err => {
-                        console.warn('Failed to load embedded image:', err);
+                        console.warn('❌ Failed to load embedded image:', err);
                         checkRender();
                     });
+                } else {
+                    console.warn('⚠️ Embedded image has no data or URL:', el.embeddedImage);
                 }
             }
             
