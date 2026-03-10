@@ -30,6 +30,7 @@ class MindmapApp {
         this.selectedConnection = null;
         this.isDraggingControlPoint = false;
         this.draggingControlPointIndex = -1;
+        this.controlPointDragAxis = null;
         this.isDraggingMiddleSegment = false;
         this.dragStartPos = null;
         this.dragStartControlPoints = null;
@@ -217,6 +218,7 @@ class MindmapApp {
                 this.isDraggingControlPoint = true;
                 this.draggingControlPointIndex = controlPointIndex;
                 this.dragStartPos = { x: pos.x, y: pos.y };
+                this.controlPointDragAxis = this.getControlPointDragAxis(this.selectedConnection, controlPointIndex);
                 return;
             }
             
@@ -425,62 +427,26 @@ class MindmapApp {
                 ];
             }
             
-            // Move both control points together to maintain right angles
-            const dx = pos.x - this.dragStartPos.x;
-            const dy = pos.y - this.dragStartPos.y;
-            
-            // Get the original path to determine orientation
-            const path = this.selectedConnection._path;
-            if (path && path.length >= 4) {
-                // Check if dragging point is on a horizontal or vertical segment
-                if (this.draggingControlPointIndex === 0) {
-                    // First control point - affects first bend
-                    // Keep it aligned with the line from start
-                    if (Math.abs(path[0].y - path[1].y) < 1) {
-                        // Horizontal segment from start - only allow vertical movement
-                        this.selectedConnection.controlPoints[0] = { 
-                            x: this.selectedConnection.controlPoints[0].x, 
-                            y: pos.y 
-                        };
-                        this.selectedConnection.controlPoints[1] = { 
-                            x: this.selectedConnection.controlPoints[1].x, 
-                            y: pos.y 
-                        };
-                    } else {
-                        // Vertical segment from start - only allow horizontal movement
-                        this.selectedConnection.controlPoints[0] = { 
-                            x: pos.x, 
-                            y: this.selectedConnection.controlPoints[0].y 
-                        };
-                        this.selectedConnection.controlPoints[1] = { 
-                            x: pos.x, 
-                            y: this.selectedConnection.controlPoints[1].y 
-                        };
-                    }
-                } else {
-                    // Second control point - affects second bend
-                    if (Math.abs(path[3].y - path[2].y) < 1) {
-                        // Horizontal segment to end - only allow vertical movement
-                        this.selectedConnection.controlPoints[0] = { 
-                            x: this.selectedConnection.controlPoints[0].x, 
-                            y: pos.y 
-                        };
-                        this.selectedConnection.controlPoints[1] = { 
-                            x: this.selectedConnection.controlPoints[1].x, 
-                            y: pos.y 
-                        };
-                    } else {
-                        // Vertical segment to end - only allow horizontal movement
-                        this.selectedConnection.controlPoints[0] = { 
-                            x: pos.x, 
-                            y: this.selectedConnection.controlPoints[0].y 
-                        };
-                        this.selectedConnection.controlPoints[1] = { 
-                            x: pos.x, 
-                            y: this.selectedConnection.controlPoints[1].y 
-                        };
-                    }
-                }
+            const axis = this.controlPointDragAxis || this.getControlPointDragAxis(this.selectedConnection, this.draggingControlPointIndex);
+
+            if (axis === 'x') {
+                this.selectedConnection.controlPoints[0] = {
+                    x: pos.x,
+                    y: this.selectedConnection.controlPoints[0].y
+                };
+                this.selectedConnection.controlPoints[1] = {
+                    x: pos.x,
+                    y: this.selectedConnection.controlPoints[1].y
+                };
+            } else if (axis === 'y') {
+                this.selectedConnection.controlPoints[0] = {
+                    x: this.selectedConnection.controlPoints[0].x,
+                    y: pos.y
+                };
+                this.selectedConnection.controlPoints[1] = {
+                    x: this.selectedConnection.controlPoints[1].x,
+                    y: pos.y
+                };
             }
             
             this.render();
@@ -557,6 +523,7 @@ class MindmapApp {
             this.isDraggingControlPoint = false;
             this.isDraggingMiddleSegment = false;
             this.draggingControlPointIndex = -1;
+            this.controlPointDragAxis = null;
             this.dragStartPos = null;
             this.dragStartControlPoints = null;
             this.saveState();
@@ -921,6 +888,21 @@ class MindmapApp {
             }
         }
         return null;
+    }
+
+    getControlPointDragAxis(connection, controlPointIndex) {
+        if (!connection || !connection._path || connection._path.length < 4) {
+            return 'y';
+        }
+
+        const path = connection._path;
+        if (controlPointIndex === 0) {
+            // First bend follows first segment orientation
+            return Math.abs(path[0].y - path[1].y) < 1 ? 'y' : 'x';
+        }
+
+        // Second bend follows final segment orientation
+        return Math.abs(path[3].y - path[2].y) < 1 ? 'y' : 'x';
     }
 
     getConnectionPoints(element) {
@@ -2795,7 +2777,7 @@ class MindmapApp {
         }
     }
 
-    // Create child shape (Tab key) - creates shape to the right with connection
+    // Create child shape (Tab key) - creates aligned shape above or below with connection
     createChildShape() {
         if (this.selectedElements.length !== 1) return;
 
@@ -2806,17 +2788,23 @@ class MindmapApp {
         const fillColor = this.getRandomPastelColor();
         const strokeColor = this.getStrokeForFill(fillColor);
 
-        // Position child to the right of parent
-        const spacing = 50;
-        const newX = parentBounds.x + parentBounds.width + spacing;
-        const newY = parentBounds.y;
+        const childSize = {
+            width: parentBounds.width,
+            height: parentBounds.height
+        };
+
+        // Place child in a vertically aligned slot (below first, then nearest free slot above/below)
+        const spacing = 30;
+        const position = this.findAlignedVerticalPlacement(parentBounds, childSize, spacing);
+        const newX = position.x;
+        const newY = position.y;
 
         const child = this.createElement(
             parent.type,
             newX,
             newY,
-            newX + this.defaultWidth,
-            newY + this.defaultHeight
+            newX + childSize.width,
+            newY + childSize.height
         );
         child.fillColor = fillColor;
         child.strokeColor = strokeColor;
@@ -2830,6 +2818,49 @@ class MindmapApp {
 
         // Start editing the new shape
         this.editElementText(child);
+    }
+
+    findAlignedVerticalPlacement(anchorBounds, newSize, spacing = 30) {
+        const x = anchorBounds.x;
+        const step = newSize.height + spacing;
+
+        // Prefer below first
+        const preferredY = anchorBounds.y + step;
+        if (!this.hasOverlap(x, preferredY, newSize.width, newSize.height)) {
+            return { x, y: preferredY };
+        }
+
+        // Then alternate to closest slot above / below
+        for (let distance = 1; distance < 200; distance++) {
+            const upY = anchorBounds.y - step * distance;
+            if (!this.hasOverlap(x, upY, newSize.width, newSize.height)) {
+                return { x, y: upY };
+            }
+
+            const downY = anchorBounds.y + step * (distance + 1);
+            if (!this.hasOverlap(x, downY, newSize.width, newSize.height)) {
+                return { x, y: downY };
+            }
+        }
+
+        return { x, y: preferredY };
+    }
+
+    hasOverlap(x, y, width, height, padding = 8) {
+        const candidate = {
+            x: x - padding,
+            y: y - padding,
+            width: width + padding * 2,
+            height: height + padding * 2
+        };
+
+        return this.elements.some((element) => {
+            const bounds = this.getElementBounds(element);
+            return candidate.x < bounds.x + bounds.width &&
+                candidate.x + candidate.width > bounds.x &&
+                candidate.y < bounds.y + bounds.height &&
+                candidate.y + candidate.height > bounds.y;
+        });
     }
 
     // Create sibling shape (Enter key) - creates shape below at same level
