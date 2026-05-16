@@ -2950,6 +2950,10 @@ class MindmapApp {
         document.getElementById('submitBtn').addEventListener('click', () => this.showSubmitModal());
         document.getElementById('clearBtn').addEventListener('click', () => this.clearCanvas());
         document.getElementById('exportBtn').addEventListener('click', () => this.exportAsPng());
+        const syllabusBtn = document.getElementById('syllabusBtn');
+        if (syllabusBtn) {
+            syllabusBtn.addEventListener('click', () => this.showSyllabusModal());
+        }
 
         // Emoji buttons (in properties panel)
         document.querySelectorAll('.emoji-btn').forEach(btn => {
@@ -3179,6 +3183,248 @@ class MindmapApp {
     }
 
     // Modal Setup
+    // ===== Syllabus / Learning Objectives =====
+    showSyllabusModal() {
+        if (typeof SYLLABUS_DATA === 'undefined') {
+            alert('Syllabus data is unavailable.');
+            return;
+        }
+
+        const themeSelect = document.getElementById('syllabusTheme');
+        const topicSelect = document.getElementById('syllabusTopic');
+        const objectivesDiv = document.getElementById('syllabusObjectives');
+        const addBtn = document.getElementById('confirmAddObjectives');
+        const selectAllBtn = document.getElementById('selectAllObjectives');
+
+        // Populate themes (idempotent — only fill if empty)
+        if (themeSelect.options.length <= 1) {
+            SYLLABUS_DATA.themes.forEach(theme => {
+                const opt = document.createElement('option');
+                opt.value = theme.id;
+                opt.textContent = `${theme.icon}  ${theme.name}`;
+                themeSelect.appendChild(opt);
+            });
+        }
+
+        // Reset state
+        themeSelect.value = '';
+        topicSelect.innerHTML = '<option value="">Select a topic...</option>';
+        topicSelect.disabled = true;
+        objectivesDiv.innerHTML = '<p class="syllabus-hint">Pick a theme and topic above to see learning objectives.</p>';
+        addBtn.disabled = true;
+        selectAllBtn.style.display = 'none';
+
+        // Wire handlers once
+        if (!this._syllabusModalWired) {
+            this._syllabusModalWired = true;
+
+            themeSelect.addEventListener('change', () => {
+                const theme = SYLLABUS_DATA.themes.find(t => t.id === themeSelect.value);
+                topicSelect.innerHTML = '<option value="">Select a topic...</option>';
+                objectivesDiv.innerHTML = '<p class="syllabus-hint">Pick a topic above to see learning objectives.</p>';
+                addBtn.disabled = true;
+                selectAllBtn.style.display = 'none';
+
+                if (!theme) {
+                    topicSelect.disabled = true;
+                    return;
+                }
+
+                theme.topics.forEach(topic => {
+                    const opt = document.createElement('option');
+                    opt.value = topic.id;
+                    opt.textContent = `${topic.name} (${topic.level})`;
+                    topicSelect.appendChild(opt);
+                });
+                topicSelect.disabled = false;
+            });
+
+            topicSelect.addEventListener('change', () => {
+                const theme = SYLLABUS_DATA.themes.find(t => t.id === themeSelect.value);
+                const topic = theme && theme.topics.find(tp => tp.id === topicSelect.value);
+                if (!topic) {
+                    objectivesDiv.innerHTML = '<p class="syllabus-hint">Pick a topic above to see learning objectives.</p>';
+                    addBtn.disabled = true;
+                    selectAllBtn.style.display = 'none';
+                    return;
+                }
+                this.renderSyllabusObjectives(topic);
+                addBtn.disabled = false;
+                selectAllBtn.style.display = 'inline-block';
+            });
+
+            selectAllBtn.addEventListener('click', () => {
+                objectivesDiv.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+                    cb.checked = true;
+                });
+            });
+
+            addBtn.addEventListener('click', () => this.addSelectedObjectivesToCanvas());
+
+            document.getElementById('closeSyllabusModal').addEventListener('click', () => {
+                document.getElementById('syllabusModal').style.display = 'none';
+            });
+            document.getElementById('cancelSyllabusModal').addEventListener('click', () => {
+                document.getElementById('syllabusModal').style.display = 'none';
+            });
+        }
+
+        document.getElementById('syllabusModal').style.display = 'flex';
+    }
+
+    renderSyllabusObjectives(topic) {
+        const container = document.getElementById('syllabusObjectives');
+        const sections = [
+            { key: 'coreIdeas', label: 'Core Ideas', items: topic.coreIdeas || [] },
+            { key: 'practices', label: 'Practices', items: topic.practices || [] },
+            { key: 'values', label: 'Values, Ethics & Attitudes', items: topic.values || [] }
+        ];
+
+        const html = sections.map(section => {
+            if (section.items.length === 0) return '';
+            const checkboxes = section.items.map((text, i) => {
+                const id = `obj-${section.key}-${i}`;
+                const escaped = text.replace(/"/g, '&quot;');
+                return `
+                    <label class="syllabus-objective">
+                        <input type="checkbox" id="${id}" data-category="${section.key}" data-text="${escaped}" checked>
+                        <span>${text}</span>
+                    </label>
+                `;
+            }).join('');
+            return `
+                <div class="syllabus-section" data-category="${section.key}">
+                    <h4>${section.label}</h4>
+                    ${checkboxes}
+                </div>
+            `;
+        }).join('');
+
+        container.innerHTML = html || '<p class="syllabus-hint">No objectives listed for this topic.</p>';
+    }
+
+    addSelectedObjectivesToCanvas() {
+        const themeSelect = document.getElementById('syllabusTheme');
+        const topicSelect = document.getElementById('syllabusTopic');
+        const theme = SYLLABUS_DATA.themes.find(t => t.id === themeSelect.value);
+        const topic = theme && theme.topics.find(tp => tp.id === topicSelect.value);
+        if (!topic) return;
+
+        const checked = Array.from(
+            document.querySelectorAll('#syllabusObjectives input[type="checkbox"]:checked')
+        );
+        if (checked.length === 0) {
+            alert('Please select at least one learning objective to add.');
+            return;
+        }
+
+        // Group selections by category in the order they appear
+        const grouped = { coreIdeas: [], practices: [], values: [] };
+        checked.forEach(cb => {
+            const category = cb.dataset.category;
+            const text = cb.dataset.text;
+            if (grouped[category]) grouped[category].push(text);
+        });
+
+        const categoryStyles = {
+            coreIdeas: { shape: 'rect', fill: '#BAE1FF', label: 'Core Idea' },
+            practices: { shape: 'diamond', fill: '#BAFFC9', label: 'Practice' },
+            values: { shape: 'circle', fill: '#FFDFBA', label: 'Value' }
+        };
+
+        // Place topic node near the centre of the current view, avoiding overlaps
+        const viewCenter = this.getViewCenterWorld();
+        const topicWidth = 220;
+        const topicHeight = 90;
+        const topicPos = this.findFreeSpot(
+            viewCenter.x - topicWidth / 2,
+            viewCenter.y - topicHeight / 2,
+            topicWidth,
+            topicHeight
+        );
+
+        const topicNode = this.createElement(
+            'rect',
+            topicPos.x, topicPos.y,
+            topicPos.x + topicWidth, topicPos.y + topicHeight
+        );
+        topicNode.text = `${topic.name}\n(${topic.level})`;
+        topicNode.fillColor = '#E0BBE4';
+        topicNode.strokeColor = this.getStrokeForFill('#E0BBE4');
+        topicNode.fontSize = 16;
+        this.elements.push(topicNode);
+
+        // Layout: stack children to the right, fanning out vertically
+        const childWidth = 200;
+        const childHeight = 80;
+        const gapX = 80;
+        const gapY = 20;
+
+        const orderedCategories = ['coreIdeas', 'practices', 'values'];
+        const childNodes = [];
+
+        let cursorY = topicPos.y - ((checked.length - 1) * (childHeight + gapY)) / 2;
+        const childX = topicPos.x + topicWidth + gapX;
+
+        orderedCategories.forEach(category => {
+            grouped[category].forEach(text => {
+                const style = categoryStyles[category];
+                let pos = { x: childX, y: cursorY };
+                if (this.hasOverlap(pos.x, pos.y, childWidth, childHeight)) {
+                    pos = this.findFreeSpot(pos.x, pos.y, childWidth, childHeight);
+                }
+                const child = this.createElement(
+                    style.shape,
+                    pos.x, pos.y,
+                    pos.x + childWidth, pos.y + childHeight
+                );
+                child.text = text;
+                child.fillColor = style.fill;
+                child.strokeColor = this.getStrokeForFill(style.fill);
+                this.elements.push(child);
+                this.createConnection(topicNode, child);
+                childNodes.push(child);
+                cursorY += childHeight + gapY;
+            });
+        });
+
+        this.selectedElements = [topicNode, ...childNodes];
+        this.saveState();
+        this.render();
+        this.updatePropertyPanel();
+
+        document.getElementById('syllabusModal').style.display = 'none';
+    }
+
+    getViewCenterWorld() {
+        const cx = this.canvasWidth / 2;
+        const cy = this.canvasHeight / 2;
+        return {
+            x: (cx - this.panOffset.x) / this.zoom,
+            y: (cy - this.panOffset.y) / this.zoom
+        };
+    }
+
+    findFreeSpot(startX, startY, width, height) {
+        if (!this.hasOverlap(startX, startY, width, height)) {
+            return { x: startX, y: startY };
+        }
+        const step = 40;
+        for (let radius = 1; radius < 50; radius++) {
+            for (let dx = -radius; dx <= radius; dx++) {
+                for (let dy = -radius; dy <= radius; dy++) {
+                    if (Math.abs(dx) !== radius && Math.abs(dy) !== radius) continue;
+                    const x = startX + dx * step;
+                    const y = startY + dy * step;
+                    if (!this.hasOverlap(x, y, width, height)) {
+                        return { x, y };
+                    }
+                }
+            }
+        }
+        return { x: startX, y: startY };
+    }
+
     setupModals() {
         // Save Modal
         document.getElementById('closeSaveModal').addEventListener('click', () => {
