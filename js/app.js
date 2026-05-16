@@ -582,6 +582,12 @@ class MindmapApp {
         const element = this.getElementAtPosition(pos);
 
         if (element && element.type !== 'arrow' && element.type !== 'line') {
+            // If the double-click is inside the embedded image region, open the lightbox
+            // instead of starting text editing — students often want to read text in images.
+            if (this.isPointInEmbeddedImage(pos, element) || element.type === 'image') {
+                this.showImageLightbox(element);
+                return;
+            }
             this.editElementText(element);
         } else if (this.currentTool === 'select') {
             // Create transparent text element on double click
@@ -753,17 +759,26 @@ class MindmapApp {
         this.ctx.lineCap = 'round';
         this.ctx.lineJoin = 'round';
 
-        // Draw the path
+        // Draw the path as a smooth cubic Bezier when we have the full 4-point path,
+        // otherwise fall back to straight segments.
         this.ctx.beginPath();
         this.ctx.moveTo(path[0].x, path[0].y);
-        for (let i = 1; i < path.length; i++) {
-            this.ctx.lineTo(path[i].x, path[i].y);
+        if (path.length >= 4) {
+            this.ctx.bezierCurveTo(
+                path[1].x, path[1].y,
+                path[2].x, path[2].y,
+                path[3].x, path[3].y
+            );
+        } else {
+            for (let i = 1; i < path.length; i++) {
+                this.ctx.lineTo(path[i].x, path[i].y);
+            }
         }
         this.ctx.stroke();
 
-        // Draw arrowhead at the end
+        // Draw arrowhead at the end, oriented along the Bezier's tangent
         const lastPoint = path[path.length - 1];
-        const prevPoint = path[path.length - 2];
+        const prevPoint = path.length >= 4 ? path[2] : path[path.length - 2];
         this.drawArrowhead(prevPoint, lastPoint);
 
         // Draw control points (yellow dots) at the middle points
@@ -2047,6 +2062,44 @@ class MindmapApp {
         };
     }
 
+    // Compute the on-canvas rectangle covered by an element's embedded image
+    getEmbeddedImageRect(element) {
+        if (!element || !element.embeddedImage || !element.embeddedImage.image) return null;
+        const img = element.embeddedImage;
+        // Recompute padding the same way drawShape does
+        const width = element.width;
+        const height = element.height;
+        let padding = 10;
+        if (element.type === 'diamond') padding = Math.min(width, height) * 0.25;
+        else if (element.type === 'triangle') padding = Math.min(width, height) * 0.2;
+        else if (element.type === 'circle') padding = Math.min(width, height) * 0.15;
+
+        const dims = this.getEmbeddedImageDimensions(element, padding);
+        const pos = img.position || 'bottom';
+        let imgX, imgY;
+        if (pos === 'bottom') {
+            imgX = element.x + (element.width - dims.width) / 2;
+            imgY = element.y + element.height - dims.height - padding;
+        } else if (pos === 'top') {
+            imgX = element.x + (element.width - dims.width) / 2;
+            imgY = element.y + padding;
+        } else if (pos === 'left') {
+            imgX = element.x + padding;
+            imgY = element.y + (element.height - dims.height) / 2;
+        } else { // right
+            imgX = element.x + element.width - dims.width - padding;
+            imgY = element.y + (element.height - dims.height) / 2;
+        }
+        return { x: imgX, y: imgY, width: dims.width, height: dims.height };
+    }
+
+    isPointInEmbeddedImage(pos, element) {
+        const rect = this.getEmbeddedImageRect(element);
+        if (!rect) return false;
+        return pos.x >= rect.x && pos.x <= rect.x + rect.width &&
+               pos.y >= rect.y && pos.y <= rect.y + rect.height;
+    }
+
     // Draw embedded image inside shape
     drawEmbeddedImage(element, padding) {
         const img = element.embeddedImage;
@@ -2606,6 +2659,57 @@ class MindmapApp {
         }
     }
 
+    // Resolve a usable image src for an element with an embedded or raw image
+    getElementImageSrc(element) {
+        if (!element) return null;
+        if (element.embeddedImage) {
+            const ei = element.embeddedImage;
+            if (ei.image && ei.image.src) return ei.image.src;
+            if (ei.url) return ei.url;
+            if (ei.data) return ei.data;
+        }
+        if (element.type === 'image') {
+            if (element.image && element.image.src) return element.image.src;
+            if (element.imageUrl) return element.imageUrl;
+            if (element.imageData) return element.imageData;
+        }
+        return null;
+    }
+
+    showImageLightbox(element) {
+        const src = this.getElementImageSrc(element);
+        if (!src) {
+            alert('This element does not have an image to preview.');
+            return;
+        }
+        const lightbox = document.getElementById('imageLightbox');
+        const lightboxImg = document.getElementById('lightboxImage');
+        if (!lightbox || !lightboxImg) return;
+        lightboxImg.src = src;
+        lightbox.style.display = 'flex';
+    }
+
+    closeImageLightbox() {
+        const lightbox = document.getElementById('imageLightbox');
+        if (lightbox) lightbox.style.display = 'none';
+    }
+
+    newMap() {
+        const hasWork = this.elements.length > 0;
+        if (hasWork && !confirm('Start a new mindmap? Any unsaved changes will be lost.')) {
+            return;
+        }
+        this.elements = [];
+        this.connections = [];
+        this.selectedElements = [];
+        this.currentMindmapName = null;
+        this.panOffset = { x: 0, y: 0 };
+        this.zoom = 1;
+        this.saveState();
+        this.render();
+        this.updatePropertyPanel();
+    }
+
     // Text Editing
     editElementText(element) {
         const bounds = this.getElementBounds(element);
@@ -2777,7 +2881,7 @@ class MindmapApp {
         }
     }
 
-    // Create child shape (Tab key) - creates aligned shape above or below with connection
+    // Create child shape (Tab key) - places child to the right of parent, vertically stacked
     createChildShape() {
         if (this.selectedElements.length !== 1) return;
 
@@ -2793,9 +2897,8 @@ class MindmapApp {
             height: parentBounds.height
         };
 
-        // Place child in a vertically aligned slot (below first, then nearest free slot above/below)
-        const spacing = 30;
-        const position = this.findAlignedVerticalPlacement(parentBounds, childSize, spacing);
+        // Place child to the right of parent, aligned with existing children
+        const position = this.findChildPlacement(parent, childSize);
         const newX = position.x;
         const newY = position.y;
 
@@ -2818,6 +2921,43 @@ class MindmapApp {
 
         // Start editing the new shape
         this.editElementText(child);
+    }
+
+    // Place a child node to the right of the parent, vertically stacked beneath
+    // any existing children so siblings line up neatly at the same x.
+    findChildPlacement(parent, childSize, gapX = 80, gapY = 20) {
+        const parentBounds = this.getElementBounds(parent);
+        const childX = parentBounds.x + parentBounds.width + gapX;
+
+        const existingChildren = this.connections
+            .filter(c => c.from === parent && c.to.type !== 'arrow' && c.to.type !== 'line')
+            .map(c => c.to);
+
+        if (existingChildren.length === 0) {
+            // First child: vertically centered with the parent
+            const y = parentBounds.y + parentBounds.height / 2 - childSize.height / 2;
+            return this.resolveChildOverlap(childX, y, childSize, gapY);
+        }
+
+        // Place beneath the lowest existing sibling so children stack neatly
+        let maxBottom = -Infinity;
+        existingChildren.forEach(child => {
+            const b = this.getElementBounds(child);
+            maxBottom = Math.max(maxBottom, b.y + b.height);
+        });
+        const y = maxBottom + gapY;
+        return this.resolveChildOverlap(childX, y, childSize, gapY);
+    }
+
+    resolveChildOverlap(x, y, size, gapY) {
+        let candidateY = y;
+        for (let i = 0; i < 200; i++) {
+            if (!this.hasOverlap(x, candidateY, size.width, size.height)) {
+                return { x, y: candidateY };
+            }
+            candidateY += size.height + gapY;
+        }
+        return { x, y };
     }
 
     findAlignedVerticalPlacement(anchorBounds, newSize, spacing = 30) {
@@ -2950,6 +3090,10 @@ class MindmapApp {
         document.getElementById('submitBtn').addEventListener('click', () => this.showSubmitModal());
         document.getElementById('clearBtn').addEventListener('click', () => this.clearCanvas());
         document.getElementById('exportBtn').addEventListener('click', () => this.exportAsPng());
+        const newMapBtn = document.getElementById('newMapBtn');
+        if (newMapBtn) {
+            newMapBtn.addEventListener('click', () => this.newMap());
+        }
         const syllabusBtn = document.getElementById('syllabusBtn');
         if (syllabusBtn) {
             syllabusBtn.addEventListener('click', () => this.showSyllabusModal());
@@ -3119,6 +3263,33 @@ class MindmapApp {
                 }
             });
         }
+
+        // View larger image button
+        const viewLargerBtn = document.getElementById('viewLargerImage');
+        if (viewLargerBtn) {
+            viewLargerBtn.addEventListener('click', () => {
+                if (this.selectedElements.length === 1) {
+                    this.showImageLightbox(this.selectedElements[0]);
+                }
+            });
+        }
+
+        // Lightbox close handlers
+        const lightbox = document.getElementById('imageLightbox');
+        const closeLightboxBtn = document.getElementById('closeLightbox');
+        if (lightbox) {
+            lightbox.addEventListener('click', (e) => {
+                if (e.target === lightbox) this.closeImageLightbox();
+            });
+        }
+        if (closeLightboxBtn) {
+            closeLightboxBtn.addEventListener('click', () => this.closeImageLightbox());
+        }
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && lightbox && lightbox.style.display !== 'none') {
+                this.closeImageLightbox();
+            }
+        });
 
         // Image scale slider
         const imgScaleSlider = document.getElementById('imgScale');
@@ -3863,60 +4034,173 @@ class MindmapApp {
         // Render into the side panel if open, fall back to legacy modal list
         const panelList = document.getElementById('savedMapsList');
         const modalList = document.getElementById('mindmapList');
-        const listEl = (panelList && document.getElementById('savedMapsPanel').style.display !== 'none')
-            ? panelList
-            : modalList;
+        const panelOpen = panelList && document.getElementById('savedMapsPanel').style.display !== 'none';
+        const listEl = panelOpen ? panelList : modalList;
 
         if (!listEl) return;
         listEl.innerHTML = '<p style="padding: 20px;">Loading...</p>';
 
         try {
-            const mindmaps = await FirebaseService.loadMindmapsList();
+            // Load both in parallel — published mindmaps for everyone, own for the user
+            const [own, published] = await Promise.all([
+                FirebaseService.loadMindmapsList(),
+                FirebaseService.loadPublishedMindmaps().catch(err => {
+                    console.warn('Failed to load published mindmaps:', err);
+                    return [];
+                })
+            ]);
 
-            if (mindmaps.length === 0) {
-                listEl.innerHTML = '<p style="padding: 20px;">No saved mindmaps yet. Save one to get started!</p>';
-                return;
-            }
+            const isAdmin = FirebaseService.isAdmin();
+            const currentUid = FirebaseService.getCurrentUser()?.uid;
+
+            // Exclude published mindmaps that belong to the current user — those will
+            // appear in "My Saved Maps" already (admin sees them with a published badge).
+            const publishedByOthers = published.filter(m => m.userId !== currentUid);
+            // For admin (Mr Chung), let "Mr Chung's Mindmaps" reflect their published items
+            const publishedSection = isAdmin
+                ? published.filter(m => m.userId === currentUid)
+                : publishedByOthers;
 
             listEl.innerHTML = '';
-            mindmaps.forEach(mindmap => {
-                const item = document.createElement('div');
-                item.className = 'mindmap-item';
 
-                // Check if thumbnail exists
-                const thumbnailHtml = mindmap.thumbnail
-                    ? `<img src="${mindmap.thumbnail}" alt="Preview" class="mindmap-thumbnail" onerror="this.style.display='none'">`
-                    : `<div class="mindmap-thumbnail-placeholder">No Preview</div>`;
+            // ===== Section 1: Mr Chung's Mindmaps =====
+            if (publishedSection.length > 0 || !isAdmin) {
+                const heading = document.createElement('div');
+                heading.className = 'panel-section-heading';
+                heading.innerHTML = `<span>📌 Mr Chung's Mindmaps</span>`;
+                listEl.appendChild(heading);
 
-                item.innerHTML = `
-                    ${thumbnailHtml}
-                    <div class="mindmap-info">
-                        <div class="name">${mindmap.name}</div>
-                        <div class="date">${mindmap.updatedAt.toLocaleDateString()}</div>
-                    </div>
-                    <button class="delete-btn" title="Delete">X</button>
-                `;
+                if (publishedSection.length === 0) {
+                    const empty = document.createElement('p');
+                    empty.className = 'panel-section-empty';
+                    empty.textContent = 'No shared mindmaps yet.';
+                    listEl.appendChild(empty);
+                } else {
+                    publishedSection.forEach(m => {
+                        listEl.appendChild(this.renderSavedMapItem(m, { mode: 'published', isAdmin, currentUid }));
+                    });
+                }
+            }
 
-                // Make the entire item clickable (except delete button)
-                item.addEventListener('click', (e) => {
-                    if (!e.target.classList.contains('delete-btn')) {
-                        this.loadMindmap(mindmap.id);
-                    }
+            // ===== Section 2: My Saved Maps =====
+            const ownHeading = document.createElement('div');
+            ownHeading.className = 'panel-section-heading';
+            ownHeading.innerHTML = `<span>📂 My Saved Maps</span>`;
+            listEl.appendChild(ownHeading);
+
+            if (own.length === 0) {
+                const empty = document.createElement('p');
+                empty.className = 'panel-section-empty';
+                empty.textContent = 'No saved mindmaps yet. Save one to get started!';
+                listEl.appendChild(empty);
+            } else {
+                own.forEach(m => {
+                    listEl.appendChild(this.renderSavedMapItem(m, { mode: 'own', isAdmin, currentUid }));
                 });
-
-                item.querySelector('.delete-btn').addEventListener('click', async (e) => {
-                    e.stopPropagation();
-                    if (confirm('Delete this mindmap?')) {
-                        await FirebaseService.deleteMindmap(mindmap.id);
-                        this.loadMindmapsList();
-                    }
-                });
-
-                listEl.appendChild(item);
-            });
+            }
         } catch (error) {
             console.error('Load list error:', error);
             listEl.innerHTML = '<p style="padding: 20px;">Failed to load mindmaps.</p>';
+        }
+    }
+
+    renderSavedMapItem(mindmap, options = {}) {
+        const { mode = 'own', isAdmin = false, currentUid = null } = options;
+        const item = document.createElement('div');
+        item.className = 'mindmap-item';
+
+        const thumbnailHtml = mindmap.thumbnail
+            ? `<img src="${mindmap.thumbnail}" alt="Preview" class="mindmap-thumbnail" onerror="this.style.display='none'">`
+            : `<div class="mindmap-thumbnail-placeholder">No Preview</div>`;
+
+        // Build action buttons depending on context
+        let actionsHtml = '';
+        if (mode === 'published') {
+            actionsHtml = `<button class="clone-btn" title="Clone & edit a copy">📋 Clone</button>`;
+        }
+        const canModify = mode === 'own' || (isAdmin && mindmap.userId === currentUid);
+        if (canModify) {
+            if (isAdmin) {
+                const published = !!mindmap.isPublished;
+                actionsHtml += `<button class="publish-btn ${published ? 'unpublish' : ''}" title="${published ? 'Unpublish' : 'Publish to all students'}">${published ? '🔕 Unpublish' : '📢 Publish'}</button>`;
+            }
+            actionsHtml += `<button class="delete-btn" title="Delete">X</button>`;
+        }
+
+        const publishedBadge = (mode === 'own' && mindmap.isPublished)
+            ? `<span class="published-badge" title="Visible to all students">📢 Published</span>`
+            : '';
+
+        item.innerHTML = `
+            ${thumbnailHtml}
+            <div class="mindmap-info">
+                <div class="name">${mindmap.name} ${publishedBadge}</div>
+                <div class="date">${mindmap.updatedAt.toLocaleDateString()}</div>
+            </div>
+            <div class="mindmap-actions">${actionsHtml}</div>
+        `;
+
+        // Click the row body to open/clone
+        item.addEventListener('click', (e) => {
+            if (e.target.closest('.mindmap-actions')) return;
+            if (mode === 'published') {
+                this.cloneMindmap(mindmap.id);
+            } else {
+                this.loadMindmap(mindmap.id);
+            }
+        });
+
+        const cloneBtn = item.querySelector('.clone-btn');
+        if (cloneBtn) {
+            cloneBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.cloneMindmap(mindmap.id);
+            });
+        }
+
+        const publishBtn = item.querySelector('.publish-btn');
+        if (publishBtn) {
+            publishBtn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                try {
+                    await FirebaseService.setMindmapPublished(mindmap.id, !mindmap.isPublished);
+                    this.loadMindmapsList();
+                } catch (err) {
+                    console.error('Publish toggle error:', err);
+                    alert('Failed to update publish status: ' + err.message);
+                }
+            });
+        }
+
+        const deleteBtn = item.querySelector('.delete-btn');
+        if (deleteBtn) {
+            deleteBtn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                if (confirm('Delete this mindmap?')) {
+                    await FirebaseService.deleteMindmap(mindmap.id);
+                    this.loadMindmapsList();
+                }
+            });
+        }
+
+        return item;
+    }
+
+    async cloneMindmap(id) {
+        try {
+            this.showLoading('Cloning mindmap...');
+            const mindmap = await FirebaseService.loadMindmap(id);
+            this.loadMindmapData(mindmap.data);
+            // Treat as a new local mindmap — Save will prompt for a fresh name
+            const author = mindmap.publishedByName || 'Mr Chung';
+            this.currentMindmapName = `${mindmap.name} (copy)`;
+            this.hideLoading();
+            this.closeSavedMapsPanel();
+            alert(`📋 Cloned "${mindmap.name}" from ${author}.\nEdit it and use Save to keep your own copy with a new name.`);
+        } catch (error) {
+            this.hideLoading();
+            console.error('Clone error:', error);
+            alert('Failed to clone mindmap: ' + error.message);
         }
     }
 
@@ -4147,6 +4431,7 @@ class MindmapApp {
         const confirmPassword = document.getElementById('confirmPassword');
         const submitRegister = document.getElementById('submitRegister');
         const registerError = document.getElementById('registerError');
+        const googleSignUp = document.getElementById('googleSignUp');
         
         // Forgot password elements
         const resetEmail = document.getElementById('resetEmail');
@@ -4279,18 +4564,22 @@ class MindmapApp {
             }
         });
 
-        // Google Sign In
-        googleSignIn.addEventListener('click', async () => {
+        // Google Sign In / Sign Up (same flow for both)
+        const handleGoogleAuth = async (errorElement) => {
             try {
                 await FirebaseService.signInWithGoogle();
                 loginModal.style.display = 'none';
             } catch (error) {
                 console.error('Google sign in error:', error);
                 if (error.code !== 'auth/popup-closed-by-user') {
-                    showError(loginError, 'Failed to sign in with Google');
+                    showError(errorElement, 'Failed to sign in with Google');
                 }
             }
-        });
+        };
+        googleSignIn.addEventListener('click', () => handleGoogleAuth(loginError));
+        if (googleSignUp) {
+            googleSignUp.addEventListener('click', () => handleGoogleAuth(registerError));
+        }
 
         // Registration
         submitRegister.addEventListener('click', async () => {

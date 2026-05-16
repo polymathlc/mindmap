@@ -55,6 +55,7 @@
             </div>
             <div class="toolbar-section actions">
                 <button id="tutorialBtn" class="action-btn tutorial-btn" title="Interactive Tutorial">❓ Tutorial</button>
+                <button id="newMapBtn" class="action-btn new-map-btn" title="Start a new mindmap">📄 New Map</button>
                 <button id="syllabusBtn" class="action-btn syllabus-btn" title="Add Learning Objectives from Syllabus">📚 Syllabus</button>
                 <button id="saveBtn" class="action-btn" title="Save draft (Ctrl+S)">💾 Save</button>
                 <button id="loadBtn" class="action-btn" title="Load saved (Ctrl+O)">📂 Saved Maps</button>
@@ -177,6 +178,7 @@
                         <label>Image Size: <span id="imgScaleValue">100%</span></label>
                         <input type="range" id="imgScale" min="20" max="150" value="100">
                     </div>
+                    <button id="viewLargerImage" class="action-btn primary" style="margin-top: 8px; width: 100%;">🔍 View Larger</button>
                     <button id="removeImage" class="action-btn" style="margin-top: 8px; width: 100%;">🗑️ Remove Image</button>
                 </div>
                 <button id="deleteElement" class="action-btn danger">Delete Element</button>
@@ -276,6 +278,13 @@
                     <div class="modal-actions">
                         <button id="submitRegister" class="action-btn primary">Create Account</button>
                     </div>
+                    <div class="auth-divider">
+                        <span>or</span>
+                    </div>
+                    <button id="googleSignUp" class="action-btn google-btn">
+                        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" width="18">
+                        Sign up with Google
+                    </button>
                     <div class="auth-links">
                         <a href="#" id="showLogin">Already have an account? Sign in</a>
                     </div>
@@ -571,6 +580,12 @@
                     </div>
                 </div>
             </div>
+        </div>
+
+        <!-- Image Lightbox -->
+        <div id="imageLightbox" class="image-lightbox" style="display: none;">
+            <button id="closeLightbox" class="lightbox-close" title="Close (Esc)">&times;</button>
+            <img id="lightboxImage" src="" alt="Larger view">
         </div>
     </div>
 
