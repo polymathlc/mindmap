@@ -3328,8 +3328,8 @@ class MindmapApp {
 
         const categoryStyles = {
             coreIdeas: { shape: 'rect', fill: '#BAE1FF', label: 'Core Idea' },
-            practices: { shape: 'diamond', fill: '#BAFFC9', label: 'Practice' },
-            values: { shape: 'circle', fill: '#FFDFBA', label: 'Value' }
+            practices: { shape: 'rect', fill: '#BAFFC9', label: 'Practice' },
+            values: { shape: 'rect', fill: '#FFDFBA', label: 'Value' }
         };
 
         // Place topic node near the centre of the current view, avoiding overlaps
