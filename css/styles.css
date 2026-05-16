@@ -1226,6 +1226,140 @@ body {
 
 #savedMapsList .mindmap-item {
     margin-bottom: 10px;
+    flex-wrap: wrap;
+}
+
+.panel-section-heading {
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: #6c5ce7;
+    padding: 14px 4px 8px;
+    border-bottom: 1px solid #e9ecef;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.panel-section-heading:not(:first-child) {
+    margin-top: 18px;
+}
+
+.panel-section-empty {
+    padding: 8px 4px 16px;
+    color: #888;
+    font-style: italic;
+    font-size: 13px;
+}
+
+.mindmap-actions {
+    display: flex;
+    gap: 4px;
+    margin-left: auto;
+    align-items: center;
+}
+
+.mindmap-actions button {
+    border: 1px solid #ced4da;
+    background: #fff;
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.mindmap-actions button:hover {
+    background: #f3f0ff;
+    border-color: #6c5ce7;
+}
+
+.mindmap-actions .clone-btn {
+    background: #e8f5e9;
+    border-color: #c8e6c9;
+}
+
+.mindmap-actions .clone-btn:hover {
+    background: #d6efd9;
+}
+
+.mindmap-actions .publish-btn {
+    background: #fff3e0;
+    border-color: #ffd9a3;
+}
+
+.mindmap-actions .publish-btn.unpublish {
+    background: #ffe9e9;
+    border-color: #ffc1c1;
+}
+
+.mindmap-actions .delete-btn {
+    color: #c0392b;
+    background: #fff;
+    border-color: #e9ecef;
+    font-weight: 600;
+}
+
+.mindmap-actions .delete-btn:hover {
+    background: #ffe9e9;
+    border-color: #ffc1c1;
+}
+
+.published-badge {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 6px;
+    background: #fff3e0;
+    color: #b9651b;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 600;
+    vertical-align: middle;
+}
+
+/* Image Lightbox */
+.image-lightbox {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.85);
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+    cursor: zoom-out;
+}
+
+.image-lightbox img {
+    max-width: 95vw;
+    max-height: 90vh;
+    object-fit: contain;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+    border-radius: 4px;
+    background: #fff;
+    cursor: default;
+}
+
+.lightbox-close {
+    position: absolute;
+    top: 18px;
+    right: 22px;
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.15);
+    color: #fff;
+    border: none;
+    font-size: 28px;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.lightbox-close:hover {
+    background: rgba(255, 255, 255, 0.3);
 }
 
 .assignment-card {

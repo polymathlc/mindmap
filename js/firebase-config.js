@@ -194,6 +194,31 @@ const FirebaseService = {
         await db.collection('mindmaps').doc(id).delete();
     },
 
+    // Admin: publish or unpublish a mindmap so all students can see it
+    async setMindmapPublished(id, published) {
+        if (!db) throw new Error('Firebase not initialized');
+        if (!this.isAdmin()) throw new Error('Admin access required');
+        await db.collection('mindmaps').doc(id).update({
+            isPublished: !!published,
+            publishedAt: published ? firebase.firestore.FieldValue.serverTimestamp() : null,
+            publishedByName: published ? "Mr Chung" : null
+        });
+    },
+
+    // Load mindmaps published by the admin (visible to all signed-in users)
+    async loadPublishedMindmaps() {
+        if (!db) throw new Error('Firebase not initialized');
+        const snapshot = await db.collection('mindmaps')
+            .where('isPublished', '==', true)
+            .get();
+        const docs = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            updatedAt: doc.data().updatedAt?.toDate() || new Date()
+        }));
+        return docs.sort((a, b) => b.updatedAt - a.updatedAt);
+    },
+
     // Admin: Load all mindmaps from all users (for marking)
     async loadAllMindmaps() {
         if (!db) {
