@@ -3251,12 +3251,25 @@ class MindmapApp {
                 this.renderSyllabusObjectives(topic);
                 addBtn.disabled = false;
                 selectAllBtn.style.display = 'inline-block';
+                selectAllBtn.textContent = 'Select All';
+            });
+
+            objectivesDiv.addEventListener('change', (e) => {
+                if (e.target.matches('input[type="checkbox"]')) {
+                    const checkboxes = objectivesDiv.querySelectorAll('input[type="checkbox"]');
+                    const allChecked = checkboxes.length > 0 &&
+                        Array.from(checkboxes).every(cb => cb.checked);
+                    selectAllBtn.textContent = allChecked ? 'Deselect All' : 'Select All';
+                }
             });
 
             selectAllBtn.addEventListener('click', () => {
-                objectivesDiv.querySelectorAll('input[type="checkbox"]').forEach(cb => {
-                    cb.checked = true;
-                });
+                const checkboxes = objectivesDiv.querySelectorAll('input[type="checkbox"]');
+                const allChecked = checkboxes.length > 0 &&
+                    Array.from(checkboxes).every(cb => cb.checked);
+                const newState = !allChecked;
+                checkboxes.forEach(cb => { cb.checked = newState; });
+                selectAllBtn.textContent = newState ? 'Deselect All' : 'Select All';
             });
 
             addBtn.addEventListener('click', () => this.addSelectedObjectivesToCanvas());
@@ -3287,7 +3300,7 @@ class MindmapApp {
                 const escaped = text.replace(/"/g, '&quot;');
                 return `
                     <label class="syllabus-objective">
-                        <input type="checkbox" id="${id}" data-category="${section.key}" data-text="${escaped}" checked>
+                        <input type="checkbox" id="${id}" data-category="${section.key}" data-text="${escaped}">
                         <span>${text}</span>
                     </label>
                 `;
