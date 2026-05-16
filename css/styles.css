@@ -1207,6 +1207,27 @@ body {
     padding: 15px;
 }
 
+/* Saved Maps Side Panel */
+#savedMapsList {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+}
+
+#savedMapsPanel .panel-toolbar {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+#savedMapsPanel .panel-toolbar .action-btn.primary {
+    flex: 1;
+}
+
+#savedMapsList .mindmap-item {
+    margin-bottom: 10px;
+}
+
 .assignment-card {
     background: #f8f9fa;
     border-radius: 12px;
