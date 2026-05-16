@@ -1379,6 +1379,104 @@ body {
     border-color: #6c5ce7;
 }
 
+/* Syllabus / Learning Objectives Modal */
+.syllabus-modal-content {
+    max-width: 700px;
+    max-height: 85vh;
+    position: relative;
+}
+
+.syllabus-subtitle {
+    color: #666;
+    font-size: 13px;
+    margin: -10px 0 18px;
+}
+
+.syllabus-modal-content select {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid #ced4da;
+    border-radius: 6px;
+    background: #fff;
+    font-size: 14px;
+}
+
+.syllabus-objectives {
+    margin-top: 12px;
+    max-height: 380px;
+    overflow-y: auto;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    padding: 12px;
+    background: #fafbfc;
+}
+
+.syllabus-hint {
+    color: #888;
+    font-style: italic;
+    margin: 4px 0;
+    font-size: 13px;
+}
+
+.syllabus-section {
+    margin-bottom: 16px;
+}
+
+.syllabus-section:last-child {
+    margin-bottom: 0;
+}
+
+.syllabus-section h4 {
+    margin: 0 0 8px;
+    color: #6c5ce7;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.syllabus-section[data-category="coreIdeas"] h4::before { content: '🧠 '; }
+.syllabus-section[data-category="practices"] h4::before { content: '🔬 '; }
+.syllabus-section[data-category="values"] h4::before { content: '💡 '; }
+
+.syllabus-objective {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 8px 10px;
+    background: #fff;
+    border: 1px solid #e9ecef;
+    border-radius: 6px;
+    margin-bottom: 6px;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-size: 13.5px;
+    line-height: 1.4;
+}
+
+.syllabus-objective:hover {
+    background: #f3f0ff;
+    border-color: #c4b8ff;
+}
+
+.syllabus-objective input[type="checkbox"] {
+    margin-top: 2px;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.syllabus-objective:has(input:checked) {
+    background: #ede8ff;
+    border-color: #6c5ce7;
+}
+
+.action-btn.syllabus-btn {
+    background: #b5ead7;
+}
+
+.action-btn.syllabus-btn:hover {
+    background: #9fd9c4;
+}
+
 /* Submissions Modal */
 .submissions-modal-content {
     max-width: 700px;
