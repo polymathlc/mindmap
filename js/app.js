@@ -4212,6 +4212,7 @@ class MindmapApp {
         const confirmPassword = document.getElementById('confirmPassword');
         const submitRegister = document.getElementById('submitRegister');
         const registerError = document.getElementById('registerError');
+        const googleSignUp = document.getElementById('googleSignUp');
         
         // Forgot password elements
         const resetEmail = document.getElementById('resetEmail');
@@ -4344,18 +4345,22 @@ class MindmapApp {
             }
         });
 
-        // Google Sign In
-        googleSignIn.addEventListener('click', async () => {
+        // Google Sign In / Sign Up (same flow for both)
+        const handleGoogleAuth = async (errorElement) => {
             try {
                 await FirebaseService.signInWithGoogle();
                 loginModal.style.display = 'none';
             } catch (error) {
                 console.error('Google sign in error:', error);
                 if (error.code !== 'auth/popup-closed-by-user') {
-                    showError(loginError, 'Failed to sign in with Google');
+                    showError(errorElement, 'Failed to sign in with Google');
                 }
             }
-        });
+        };
+        googleSignIn.addEventListener('click', () => handleGoogleAuth(loginError));
+        if (googleSignUp) {
+            googleSignUp.addEventListener('click', () => handleGoogleAuth(registerError));
+        }
 
         // Registration
         submitRegister.addEventListener('click', async () => {
