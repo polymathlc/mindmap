@@ -3328,8 +3328,8 @@ class MindmapApp {
 
         const categoryStyles = {
             coreIdeas: { shape: 'rect', fill: '#BAE1FF', label: 'Core Idea' },
-            practices: { shape: 'diamond', fill: '#BAFFC9', label: 'Practice' },
-            values: { shape: 'circle', fill: '#FFDFBA', label: 'Value' }
+            practices: { shape: 'rect', fill: '#BAFFC9', label: 'Practice' },
+            values: { shape: 'rect', fill: '#FFDFBA', label: 'Value' }
         };
 
         // Place topic node near the centre of the current view, avoiding overlaps
@@ -3589,7 +3589,8 @@ class MindmapApp {
             // Store the name for subsequent saves
             this.currentMindmapName = name;
             this.hideLoading();
-            alert('✅ Draft saved successfully!');
+            // Open the saved-maps side panel so the user can see their new save
+            this.openSavedMapsPanel();
         } catch (error) {
             this.hideLoading();
             console.error('Save error:', error);
@@ -3804,29 +3805,63 @@ class MindmapApp {
     }
 
     showLoadModal() {
+        // Saved Maps now lives in a persistent side panel
+        this.openSavedMapsPanel();
+    }
+
+    openSavedMapsPanel() {
         if (!FirebaseService.isConfigured()) {
             alert('Firebase is not configured. Please update js/firebase-config.js with your Firebase credentials.');
             return;
         }
 
         if (!FirebaseService.getCurrentUser()) {
-            alert('Please sign in to load your mindmaps.');
+            alert('Please sign in to view your saved mindmaps.');
             return;
         }
 
-        document.getElementById('loadModal').style.display = 'flex';
+        const panel = document.getElementById('savedMapsPanel');
+        panel.style.display = 'flex';
+        this.wireSavedMapsPanel();
         this.loadMindmapsList();
     }
 
+    closeSavedMapsPanel() {
+        const panel = document.getElementById('savedMapsPanel');
+        if (panel) panel.style.display = 'none';
+    }
+
+    wireSavedMapsPanel() {
+        if (this._savedMapsPanelWired) return;
+        this._savedMapsPanelWired = true;
+
+        document.getElementById('closeSavedMapsPanel').addEventListener('click', () => {
+            this.closeSavedMapsPanel();
+        });
+        document.getElementById('refreshSavedMapsBtn').addEventListener('click', () => {
+            this.loadMindmapsList();
+        });
+        document.getElementById('saveCurrentMapBtn').addEventListener('click', () => {
+            this.showSaveModal();
+        });
+    }
+
     async loadMindmapsList() {
-        const listEl = document.getElementById('mindmapList');
-        listEl.innerHTML = '<p>Loading...</p>';
+        // Render into the side panel if open, fall back to legacy modal list
+        const panelList = document.getElementById('savedMapsList');
+        const modalList = document.getElementById('mindmapList');
+        const listEl = (panelList && document.getElementById('savedMapsPanel').style.display !== 'none')
+            ? panelList
+            : modalList;
+
+        if (!listEl) return;
+        listEl.innerHTML = '<p style="padding: 20px;">Loading...</p>';
 
         try {
             const mindmaps = await FirebaseService.loadMindmapsList();
 
             if (mindmaps.length === 0) {
-                listEl.innerHTML = '<p>No saved mindmaps found.</p>';
+                listEl.innerHTML = '<p style="padding: 20px;">No saved mindmaps yet. Save one to get started!</p>';
                 return;
             }
 
@@ -3868,7 +3903,7 @@ class MindmapApp {
             });
         } catch (error) {
             console.error('Load list error:', error);
-            listEl.innerHTML = '<p>Failed to load mindmaps.</p>';
+            listEl.innerHTML = '<p style="padding: 20px;">Failed to load mindmaps.</p>';
         }
     }
 
