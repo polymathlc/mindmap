@@ -810,18 +810,18 @@ class MindmapApp {
         const angle = Math.atan2(to.y - from.y, to.x - from.x);
         const headLength = 12;
 
+        const leftX = to.x - headLength * Math.cos(angle - Math.PI / 6);
+        const leftY = to.y - headLength * Math.sin(angle - Math.PI / 6);
+        const rightX = to.x - headLength * Math.cos(angle + Math.PI / 6);
+        const rightY = to.y - headLength * Math.sin(angle + Math.PI / 6);
+
         this.ctx.beginPath();
         this.ctx.moveTo(to.x, to.y);
-        this.ctx.lineTo(
-            to.x - headLength * Math.cos(angle - Math.PI / 6),
-            to.y - headLength * Math.sin(angle - Math.PI / 6)
-        );
-        this.ctx.moveTo(to.x, to.y);
-        this.ctx.lineTo(
-            to.x - headLength * Math.cos(angle + Math.PI / 6),
-            to.y - headLength * Math.sin(angle + Math.PI / 6)
-        );
-        this.ctx.stroke();
+        this.ctx.lineTo(leftX, leftY);
+        this.ctx.lineTo(rightX, rightY);
+        this.ctx.closePath();
+        this.ctx.fillStyle = this.ctx.strokeStyle;
+        this.ctx.fill();
     }
 
     // Check if position is on a control point of a connection
@@ -1799,22 +1799,22 @@ class MindmapApp {
         this.ctx.lineTo(x2, y2);
         this.ctx.stroke();
 
-        // Draw arrowhead
+        // Draw arrowhead (solid triangle)
         const angle = Math.atan2(y2 - y, x2 - x);
         const headLength = 15;
 
+        const leftX = x2 - headLength * Math.cos(angle - Math.PI / 6);
+        const leftY = y2 - headLength * Math.sin(angle - Math.PI / 6);
+        const rightX = x2 - headLength * Math.cos(angle + Math.PI / 6);
+        const rightY = y2 - headLength * Math.sin(angle + Math.PI / 6);
+
         this.ctx.beginPath();
         this.ctx.moveTo(x2, y2);
-        this.ctx.lineTo(
-            x2 - headLength * Math.cos(angle - Math.PI / 6),
-            y2 - headLength * Math.sin(angle - Math.PI / 6)
-        );
-        this.ctx.moveTo(x2, y2);
-        this.ctx.lineTo(
-            x2 - headLength * Math.cos(angle + Math.PI / 6),
-            y2 - headLength * Math.sin(angle + Math.PI / 6)
-        );
-        this.ctx.stroke();
+        this.ctx.lineTo(leftX, leftY);
+        this.ctx.lineTo(rightX, rightY);
+        this.ctx.closePath();
+        this.ctx.fillStyle = this.ctx.strokeStyle;
+        this.ctx.fill();
     }
 
     drawLine(element) {
