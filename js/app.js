@@ -753,17 +753,26 @@ class MindmapApp {
         this.ctx.lineCap = 'round';
         this.ctx.lineJoin = 'round';
 
-        // Draw the path
+        // Draw the path as a smooth cubic Bezier when we have the full 4-point path,
+        // otherwise fall back to straight segments.
         this.ctx.beginPath();
         this.ctx.moveTo(path[0].x, path[0].y);
-        for (let i = 1; i < path.length; i++) {
-            this.ctx.lineTo(path[i].x, path[i].y);
+        if (path.length >= 4) {
+            this.ctx.bezierCurveTo(
+                path[1].x, path[1].y,
+                path[2].x, path[2].y,
+                path[3].x, path[3].y
+            );
+        } else {
+            for (let i = 1; i < path.length; i++) {
+                this.ctx.lineTo(path[i].x, path[i].y);
+            }
         }
         this.ctx.stroke();
 
-        // Draw arrowhead at the end
+        // Draw arrowhead at the end, oriented along the Bezier's tangent
         const lastPoint = path[path.length - 1];
-        const prevPoint = path[path.length - 2];
+        const prevPoint = path.length >= 4 ? path[2] : path[path.length - 2];
         this.drawArrowhead(prevPoint, lastPoint);
 
         // Draw control points (yellow dots) at the middle points
@@ -2606,6 +2615,22 @@ class MindmapApp {
         }
     }
 
+    newMap() {
+        const hasWork = this.elements.length > 0;
+        if (hasWork && !confirm('Start a new mindmap? Any unsaved changes will be lost.')) {
+            return;
+        }
+        this.elements = [];
+        this.connections = [];
+        this.selectedElements = [];
+        this.currentMindmapName = null;
+        this.panOffset = { x: 0, y: 0 };
+        this.zoom = 1;
+        this.saveState();
+        this.render();
+        this.updatePropertyPanel();
+    }
+
     // Text Editing
     editElementText(element) {
         const bounds = this.getElementBounds(element);
@@ -2777,7 +2802,7 @@ class MindmapApp {
         }
     }
 
-    // Create child shape (Tab key) - creates aligned shape above or below with connection
+    // Create child shape (Tab key) - places child to the right of parent, vertically stacked
     createChildShape() {
         if (this.selectedElements.length !== 1) return;
 
@@ -2793,9 +2818,8 @@ class MindmapApp {
             height: parentBounds.height
         };
 
-        // Place child in a vertically aligned slot (below first, then nearest free slot above/below)
-        const spacing = 30;
-        const position = this.findAlignedVerticalPlacement(parentBounds, childSize, spacing);
+        // Place child to the right of parent, aligned with existing children
+        const position = this.findChildPlacement(parent, childSize);
         const newX = position.x;
         const newY = position.y;
 
@@ -2818,6 +2842,43 @@ class MindmapApp {
 
         // Start editing the new shape
         this.editElementText(child);
+    }
+
+    // Place a child node to the right of the parent, vertically stacked beneath
+    // any existing children so siblings line up neatly at the same x.
+    findChildPlacement(parent, childSize, gapX = 80, gapY = 20) {
+        const parentBounds = this.getElementBounds(parent);
+        const childX = parentBounds.x + parentBounds.width + gapX;
+
+        const existingChildren = this.connections
+            .filter(c => c.from === parent && c.to.type !== 'arrow' && c.to.type !== 'line')
+            .map(c => c.to);
+
+        if (existingChildren.length === 0) {
+            // First child: vertically centered with the parent
+            const y = parentBounds.y + parentBounds.height / 2 - childSize.height / 2;
+            return this.resolveChildOverlap(childX, y, childSize, gapY);
+        }
+
+        // Place beneath the lowest existing sibling so children stack neatly
+        let maxBottom = -Infinity;
+        existingChildren.forEach(child => {
+            const b = this.getElementBounds(child);
+            maxBottom = Math.max(maxBottom, b.y + b.height);
+        });
+        const y = maxBottom + gapY;
+        return this.resolveChildOverlap(childX, y, childSize, gapY);
+    }
+
+    resolveChildOverlap(x, y, size, gapY) {
+        let candidateY = y;
+        for (let i = 0; i < 200; i++) {
+            if (!this.hasOverlap(x, candidateY, size.width, size.height)) {
+                return { x, y: candidateY };
+            }
+            candidateY += size.height + gapY;
+        }
+        return { x, y };
     }
 
     findAlignedVerticalPlacement(anchorBounds, newSize, spacing = 30) {
@@ -2950,6 +3011,10 @@ class MindmapApp {
         document.getElementById('submitBtn').addEventListener('click', () => this.showSubmitModal());
         document.getElementById('clearBtn').addEventListener('click', () => this.clearCanvas());
         document.getElementById('exportBtn').addEventListener('click', () => this.exportAsPng());
+        const newMapBtn = document.getElementById('newMapBtn');
+        if (newMapBtn) {
+            newMapBtn.addEventListener('click', () => this.newMap());
+        }
         const syllabusBtn = document.getElementById('syllabusBtn');
         if (syllabusBtn) {
             syllabusBtn.addEventListener('click', () => this.showSyllabusModal());

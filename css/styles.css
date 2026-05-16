@@ -1498,6 +1498,14 @@ body {
     background: #9fd9c4;
 }
 
+.action-btn.new-map-btn {
+    background: #fde2a8;
+}
+
+.action-btn.new-map-btn:hover {
+    background: #f6cf80;
+}
+
 /* Submissions Modal */
 .submissions-modal-content {
     max-width: 700px;
