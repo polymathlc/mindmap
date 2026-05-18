@@ -339,8 +339,9 @@ class MindmapApp {
 
         // Text boxes are smaller and transparent by default
         const isTextBox = this.currentTool === 'text';
-        const width = isTextBox ? 150 : this.defaultWidth;
-        const height = isTextBox ? 40 : this.defaultHeight;
+        const isQuestionBank = this.currentTool === 'questionBank';
+        const width = isTextBox ? 150 : (isQuestionBank ? 240 : this.defaultWidth);
+        const height = isTextBox ? 40 : (isQuestionBank ? 160 : this.defaultHeight);
 
         const element = this.createElement(
             this.currentTool,
@@ -356,6 +357,13 @@ class MindmapApp {
             element.strokeColor = 'transparent';
             element.strokeWidth = 0;
             element.fontSize = 16;
+        } else if (isQuestionBank) {
+            element.fillColor = '#FFF8DC';
+            element.strokeColor = '#D4A017';
+            element.strokeWidth = 3;
+            element.fontSize = 16;
+            element.text = '';
+            element.photos = [];
         } else {
             element.fillColor = fillColor;
             element.strokeColor = strokeColor;
@@ -582,6 +590,11 @@ class MindmapApp {
         const element = this.getElementAtPosition(pos);
 
         if (element && element.type !== 'arrow' && element.type !== 'line') {
+            // Question bank: maximize into the viewer instead of editing text
+            if (element.type === 'questionBank') {
+                this.openQuestionBank(element);
+                return;
+            }
             // If the double-click is inside the embedded image region, open the lightbox
             // instead of starting text editing — students often want to read text in images.
             if (this.isPointInEmbeddedImage(pos, element) || element.type === 'image') {
@@ -940,6 +953,12 @@ class MindmapApp {
             return;
         }
 
+        // Don't handle canvas shortcuts when Question Bank viewer is open
+        const qbViewer = document.getElementById('questionBankViewer');
+        if (qbViewer && qbViewer.style.display !== 'none') {
+            return;
+        }
+
         const key = e.key.toLowerCase();
 
         // Handle Tab and Enter for creating connected shapes
@@ -994,6 +1013,9 @@ class MindmapApp {
                     return;
                 case 'x':
                     this.setTool('text');
+                    return;
+                case 'q':
+                    this.setTool('questionBank');
                     return;
                 case 'delete':
                 case 'backspace':
@@ -1103,38 +1125,70 @@ class MindmapApp {
         // Check if we have a selected shape to paste into
         const selectedShape = this.selectedElements.length === 1 ? this.selectedElements[0] : null;
         const isShape = selectedShape && ['rect', 'circle', 'diamond', 'triangle'].includes(selectedShape.type);
+        const isQuestionBank = selectedShape && selectedShape.type === 'questionBank';
 
+        // Collect all image files first so multi-image pastes all land in the bank
+        const imageFiles = [];
+        let textItem = null;
         for (let item of items) {
-            // Handle image paste
             if (item.type.startsWith('image/')) {
-                e.preventDefault();
-                const file = item.getAsFile();
-                
-                if (isShape) {
-                    // Paste image into selected shape
-                    this.addImageToShape(selectedShape, file);
-                } else {
-                    this.addImageFromFile(file);
-                }
-                return;
-            }
-            
-            // Handle text paste into shape
-            if (item.type === 'text/plain' && isShape) {
-                e.preventDefault();
-                item.getAsString((text) => {
-                    if (selectedShape.text) {
-                        selectedShape.text += '\n' + text;
-                    } else {
-                        selectedShape.text = text;
-                    }
-                    this.saveState();
-                    this.render();
-                    this.updatePropertyPanel();
-                });
-                return;
+                const f = item.getAsFile();
+                if (f) imageFiles.push(f);
+            } else if (item.type === 'text/plain' && (isShape || isQuestionBank)) {
+                textItem = item;
             }
         }
+
+        if (imageFiles.length > 0) {
+            e.preventDefault();
+            if (isQuestionBank) {
+                imageFiles.forEach(f => this.addPhotoToQuestionBank(selectedShape, f));
+            } else if (isShape) {
+                this.addImageToShape(selectedShape, imageFiles[0]);
+            } else {
+                imageFiles.forEach(f => this.addImageFromFile(f));
+            }
+            return;
+        }
+
+        if (textItem && isShape) {
+            e.preventDefault();
+            textItem.getAsString((text) => {
+                if (selectedShape.text) {
+                    selectedShape.text += '\n' + text;
+                } else {
+                    selectedShape.text = text;
+                }
+                this.saveState();
+                this.render();
+                this.updatePropertyPanel();
+            });
+        }
+    }
+
+    addPhotoToQuestionBank(qbElement, file) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const img = new Image();
+            img.onload = () => {
+                if (!qbElement.photos) qbElement.photos = [];
+                qbElement.photos.push({
+                    data: event.target.result,
+                    image: img,
+                    originalWidth: img.width,
+                    originalHeight: img.height
+                });
+                this.saveState();
+                this.render();
+                // If the viewer is open for this bank, refresh it
+                if (this._qbActive === qbElement) {
+                    this._qbIndex = qbElement.photos.length - 1;
+                    this.renderQuestionBankViewer();
+                }
+            };
+            img.src = event.target.result;
+        };
+        reader.readAsDataURL(file);
     }
 
     // Add image to a shape
@@ -1246,6 +1300,7 @@ class MindmapApp {
             case 'diamond':
             case 'triangle':
             case 'text':
+            case 'questionBank':
                 return {
                     ...baseElement,
                     x: Math.min(x1, x2),
@@ -1727,8 +1782,103 @@ class MindmapApp {
             case 'image':
                 this.drawImage(element);
                 break;
+            case 'questionBank':
+                this.drawQuestionBank(element);
+                break;
         }
 
+        this.ctx.restore();
+    }
+
+    drawQuestionBank(element) {
+        const { x, y, width, height } = element;
+        const radius = 12;
+
+        // Dashed border to mark this as a special container
+        this.ctx.save();
+        this.ctx.beginPath();
+        this.ctx.roundRect(x, y, width, height, radius);
+        this.ctx.fill();
+        this.ctx.setLineDash([8, 4]);
+        this.ctx.stroke();
+        this.ctx.restore();
+
+        const photoCount = (element.photos && element.photos.length) || 0;
+
+        // Header label
+        this.ctx.save();
+        this.ctx.fillStyle = '#7A5C00';
+        this.ctx.font = '600 16px ' + (element.fontFamily || 'Arial');
+        this.ctx.textAlign = 'center';
+        this.ctx.textBaseline = 'top';
+        this.ctx.fillText('📚 Question Bank', x + width / 2, y + 12);
+        this.ctx.restore();
+
+        // Thumbnail strip preview
+        const stripY = y + 44;
+        const stripH = Math.max(40, height - 90);
+        const stripPad = 12;
+        const stripX = x + stripPad;
+        const stripW = width - stripPad * 2;
+
+        if (photoCount === 0) {
+            this.ctx.save();
+            this.ctx.fillStyle = '#A88E3A';
+            this.ctx.font = '13px ' + (element.fontFamily || 'Arial');
+            this.ctx.textAlign = 'center';
+            this.ctx.textBaseline = 'middle';
+            this.ctx.fillText('Paste pictures here', x + width / 2, stripY + stripH / 2 - 6);
+            this.ctx.font = '11px ' + (element.fontFamily || 'Arial');
+            this.ctx.fillText('(select first, then Ctrl+V)', x + width / 2, stripY + stripH / 2 + 12);
+            this.ctx.restore();
+        } else {
+            // Draw up to 3 thumbnails side-by-side
+            const shown = Math.min(3, photoCount);
+            const gap = 6;
+            const thumbW = (stripW - gap * (shown - 1)) / shown;
+            for (let i = 0; i < shown; i++) {
+                const photo = element.photos[i];
+                const tx = stripX + i * (thumbW + gap);
+                this.ctx.save();
+                this.ctx.fillStyle = '#fff';
+                this.ctx.strokeStyle = '#D4A017';
+                this.ctx.lineWidth = 1;
+                this.ctx.beginPath();
+                this.ctx.roundRect(tx, stripY, thumbW, stripH, 4);
+                this.ctx.fill();
+                this.ctx.stroke();
+                if (photo && photo.image) {
+                    this.ctx.save();
+                    this.ctx.beginPath();
+                    this.ctx.roundRect(tx + 2, stripY + 2, thumbW - 4, stripH - 4, 3);
+                    this.ctx.clip();
+                    const img = photo.image;
+                    const scale = Math.min((thumbW - 4) / img.width, (stripH - 4) / img.height);
+                    const dw = img.width * scale;
+                    const dh = img.height * scale;
+                    const dx = tx + (thumbW - dw) / 2;
+                    const dy = stripY + (stripH - dh) / 2;
+                    this.ctx.drawImage(img, dx, dy, dw, dh);
+                    this.ctx.restore();
+                } else {
+                    this.ctx.fillStyle = '#C8AB55';
+                    this.ctx.font = '20px Arial';
+                    this.ctx.textAlign = 'center';
+                    this.ctx.textBaseline = 'middle';
+                    this.ctx.fillText('🖼', tx + thumbW / 2, stripY + stripH / 2);
+                }
+                this.ctx.restore();
+            }
+        }
+
+        // Footer: count + hint
+        this.ctx.save();
+        this.ctx.fillStyle = '#7A5C00';
+        this.ctx.font = '600 13px ' + (element.fontFamily || 'Arial');
+        this.ctx.textAlign = 'center';
+        this.ctx.textBaseline = 'bottom';
+        const label = photoCount === 1 ? '1 picture' : `${photoCount} pictures`;
+        this.ctx.fillText(`${label} • double-click to open`, x + width / 2, y + height - 10);
         this.ctx.restore();
     }
 
@@ -2564,7 +2714,15 @@ class MindmapApp {
         const state = {
             elements: this.elements.map(el => ({
                 ...el,
-                image: undefined
+                image: undefined,
+                photos: Array.isArray(el.photos)
+                    ? el.photos.map(p => ({
+                        data: p.data,
+                        url: p.url,
+                        originalWidth: p.originalWidth,
+                        originalHeight: p.originalHeight
+                    }))
+                    : undefined
             })),
             connections: this.connections.map(c => ({
                 fromIndex: this.elements.indexOf(c.from),
@@ -2607,6 +2765,19 @@ class MindmapApp {
                 const img = new Image();
                 img.src = el.imageData;
                 el.image = img;
+            }
+            if (el.type === 'questionBank' && Array.isArray(el.photos)) {
+                el.photos = el.photos.map(p => {
+                    const src = p.data || p.url;
+                    const newPhoto = { ...p };
+                    if (src) {
+                        const img = new Image();
+                        img.onload = () => this.render();
+                        img.src = src;
+                        newPhoto.image = img;
+                    }
+                    return newPhoto;
+                });
             }
             return el;
         });
@@ -2692,6 +2863,95 @@ class MindmapApp {
     closeImageLightbox() {
         const lightbox = document.getElementById('imageLightbox');
         if (lightbox) lightbox.style.display = 'none';
+    }
+
+    // Question Bank Viewer
+    openQuestionBank(element) {
+        this._qbActive = element;
+        if (!element.photos) element.photos = [];
+        this._qbIndex = element.photos.length > 0 ? 0 : 0;
+        const viewer = document.getElementById('questionBankViewer');
+        if (!viewer) return;
+        viewer.style.display = 'flex';
+        this.renderQuestionBankViewer();
+    }
+
+    closeQuestionBankViewer() {
+        const viewer = document.getElementById('questionBankViewer');
+        if (viewer) viewer.style.display = 'none';
+        this._qbActive = null;
+    }
+
+    renderQuestionBankViewer() {
+        const element = this._qbActive;
+        if (!element) return;
+        const photos = element.photos || [];
+        const total = photos.length;
+        const img = document.getElementById('qbImage');
+        const empty = document.getElementById('qbEmpty');
+        const counter = document.getElementById('qbCounter');
+        const prev = document.getElementById('qbPrev');
+        const next = document.getElementById('qbNext');
+        const del = document.getElementById('qbDelete');
+
+        if (this._qbIndex >= total) this._qbIndex = total - 1;
+        if (this._qbIndex < 0) this._qbIndex = 0;
+
+        const isAdmin = typeof FirebaseService !== 'undefined' && FirebaseService.isAdmin && FirebaseService.isAdmin();
+
+        if (total === 0) {
+            img.style.display = 'none';
+            img.src = '';
+            empty.style.display = 'block';
+            del.style.display = 'none';
+            prev.disabled = true;
+            next.disabled = true;
+            counter.textContent = '0 / 0';
+            return;
+        }
+
+        const photo = photos[this._qbIndex];
+        const src = (photo.image && photo.image.src) || photo.url || photo.data || '';
+        empty.style.display = 'none';
+        img.style.display = 'block';
+        img.src = src;
+        counter.textContent = `${this._qbIndex + 1} / ${total}`;
+        prev.disabled = this._qbIndex === 0;
+        next.disabled = this._qbIndex === total - 1;
+        del.style.display = isAdmin ? 'inline-block' : 'none';
+    }
+
+    questionBankNext() {
+        const el = this._qbActive;
+        if (!el || !el.photos) return;
+        if (this._qbIndex < el.photos.length - 1) {
+            this._qbIndex++;
+            this.renderQuestionBankViewer();
+        }
+    }
+
+    questionBankPrev() {
+        if (!this._qbActive) return;
+        if (this._qbIndex > 0) {
+            this._qbIndex--;
+            this.renderQuestionBankViewer();
+        }
+    }
+
+    deleteCurrentQuestionBankPhoto() {
+        const el = this._qbActive;
+        if (!el || !el.photos || el.photos.length === 0) return;
+        const isAdmin = typeof FirebaseService !== 'undefined' && FirebaseService.isAdmin && FirebaseService.isAdmin();
+        if (!isAdmin) {
+            alert('Only the admin account can delete pictures from the Question Bank.');
+            return;
+        }
+        if (!confirm('Delete this picture from the Question Bank?')) return;
+        el.photos.splice(this._qbIndex, 1);
+        if (this._qbIndex >= el.photos.length) this._qbIndex = Math.max(0, el.photos.length - 1);
+        this.saveState();
+        this.render();
+        this.renderQuestionBankViewer();
     }
 
     newMap() {
@@ -3048,7 +3308,7 @@ class MindmapApp {
 
     // Toolbar Setup
     setupToolbar() {
-        const tools = ['select', 'rect', 'circle', 'diamond', 'triangle', 'arrow', 'line', 'text'];
+        const tools = ['select', 'rect', 'circle', 'diamond', 'triangle', 'arrow', 'line', 'text', 'questionBank'];
 
         tools.forEach(tool => {
             const btn = document.getElementById(tool + 'Tool');
@@ -3288,6 +3548,33 @@ class MindmapApp {
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape' && lightbox && lightbox.style.display !== 'none') {
                 this.closeImageLightbox();
+            }
+        });
+
+        // Question Bank viewer handlers
+        const qbViewer = document.getElementById('questionBankViewer');
+        const qbClose = document.getElementById('closeQbViewer');
+        const qbPrev = document.getElementById('qbPrev');
+        const qbNext = document.getElementById('qbNext');
+        const qbDelete = document.getElementById('qbDelete');
+        if (qbClose) qbClose.addEventListener('click', () => this.closeQuestionBankViewer());
+        if (qbPrev) qbPrev.addEventListener('click', () => this.questionBankPrev());
+        if (qbNext) qbNext.addEventListener('click', () => this.questionBankNext());
+        if (qbDelete) qbDelete.addEventListener('click', () => this.deleteCurrentQuestionBankPhoto());
+        if (qbViewer) {
+            qbViewer.addEventListener('click', (e) => {
+                if (e.target === qbViewer) this.closeQuestionBankViewer();
+            });
+        }
+        document.addEventListener('keydown', (e) => {
+            if (qbViewer && qbViewer.style.display !== 'none') {
+                if (e.key === 'Escape') {
+                    this.closeQuestionBankViewer();
+                } else if (e.key === 'ArrowLeft') {
+                    this.questionBankPrev();
+                } else if (e.key === 'ArrowRight') {
+                    this.questionBankNext();
+                }
             }
         });
 
@@ -3679,6 +3966,29 @@ class MindmapApp {
             const processedElements = await Promise.all(this.elements.map(async (el, index) => {
                 const processed = { ...el, image: undefined };
 
+                // Handle question bank photos
+                if (el.type === 'questionBank' && Array.isArray(el.photos)) {
+                    processed.photos = await Promise.all(el.photos.map(async (p, pi) => {
+                        const out = {
+                            url: p.url,
+                            originalWidth: p.originalWidth,
+                            originalHeight: p.originalHeight
+                        };
+                        if (p.data && !p.url) {
+                            try {
+                                const filename = `qb_${index}_${pi}_${Date.now()}.png`;
+                                out.url = await FirebaseService.uploadImage(
+                                    this.dataURLtoBlob(p.data),
+                                    filename
+                                );
+                            } catch (uploadErr) {
+                                console.warn('Failed to upload question bank photo:', uploadErr);
+                            }
+                        }
+                        return out;
+                    }));
+                }
+
                 // Handle embedded images
                 if (el.embeddedImage && el.embeddedImage.data) {
                     try {
@@ -3820,7 +4130,30 @@ class MindmapApp {
             // Process elements - upload embedded images to Storage
             const processedElements = await Promise.all(this.elements.map(async (el, index) => {
                 const processed = { ...el, image: undefined };
-                
+
+                // Handle question bank photos
+                if (el.type === 'questionBank' && Array.isArray(el.photos)) {
+                    processed.photos = await Promise.all(el.photos.map(async (p, pi) => {
+                        const out = {
+                            url: p.url,
+                            originalWidth: p.originalWidth,
+                            originalHeight: p.originalHeight
+                        };
+                        if (p.data && !p.url) {
+                            try {
+                                const filename = `submit_qb_${index}_${pi}_${Date.now()}.png`;
+                                out.url = await FirebaseService.uploadImage(
+                                    this.dataURLtoBlob(p.data),
+                                    filename
+                                );
+                            } catch (uploadErr) {
+                                console.warn('Failed to upload question bank photo:', uploadErr);
+                            }
+                        }
+                        return out;
+                    }));
+                }
+
                 if (el.embeddedImage && el.embeddedImage.data) {
                     try {
                         const filename = `submit_${index}_${Date.now()}.png`;
@@ -4257,6 +4590,25 @@ class MindmapApp {
                 }
             }
             
+            // Handle question bank photos
+            if (el.type === 'questionBank' && Array.isArray(el.photos)) {
+                el.photos = el.photos.map(p => {
+                    const photoSrc = p.data || p.url;
+                    const newPhoto = { ...p };
+                    if (photoSrc) {
+                        pendingImages++;
+                        this.loadImageWithFallback(photoSrc, p.url).then(img => {
+                            newPhoto.image = img;
+                            checkRender();
+                        }).catch(err => {
+                            console.warn('Failed to load question bank photo:', err);
+                            checkRender();
+                        });
+                    }
+                    return newPhoto;
+                });
+            }
+
             // Handle embedded images in shapes
             if (el.embeddedImage) {
                 const imgSrc = el.embeddedImage.data || el.embeddedImage.url;
