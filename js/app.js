@@ -2893,6 +2893,7 @@ class MindmapApp {
         const prev = document.getElementById('qbPrev');
         const next = document.getElementById('qbNext');
         const del = document.getElementById('qbDelete');
+        const print = document.getElementById('qbPrint');
 
         if (this._qbIndex >= total) this._qbIndex = total - 1;
         if (this._qbIndex < 0) this._qbIndex = 0;
@@ -2907,8 +2908,10 @@ class MindmapApp {
             prev.disabled = true;
             next.disabled = true;
             counter.textContent = '0 / 0';
+            if (print) print.disabled = true;
             return;
         }
+        if (print) print.disabled = false;
 
         const photo = photos[this._qbIndex];
         const src = (photo.image && photo.image.src) || photo.url || photo.data || '';
@@ -2936,6 +2939,120 @@ class MindmapApp {
             this._qbIndex--;
             this.renderQuestionBankViewer();
         }
+    }
+
+    printQuestionBank() {
+        const element = this._qbActive;
+        if (!element) return;
+        const photos = (element.photos || []).filter(p => (p.image && p.image.src) || p.url || p.data);
+        if (photos.length === 0) {
+            alert('There are no questions to print yet.');
+            return;
+        }
+        const title = (element.text && String(element.text).trim()) || 'Question Bank';
+        const escapeHtml = (s) => String(s).replace(/[&<>"']/g, c => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[c]));
+        const safeTitle = escapeHtml(title);
+
+        const pagesHtml = photos.map((photo, i) => {
+            const src = (photo.image && photo.image.src) || photo.url || photo.data || '';
+            return `
+                <section class="q-page">
+                    <header class="q-header">
+                        <span class="q-title">${safeTitle}</span>
+                        <span class="q-num">Question ${i + 1} of ${photos.length}</span>
+                    </header>
+                    <div class="q-img-wrap">
+                        <img src="${escapeHtml(src)}" alt="Question ${i + 1}">
+                    </div>
+                </section>`;
+        }).join('');
+
+        const html = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>${safeTitle}</title>
+<style>
+    @page { size: A4 portrait; margin: 12mm; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; background: #fff; color: #222;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    .q-page {
+        width: 186mm;
+        height: 273mm;
+        page-break-after: always;
+        break-after: page;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+    .q-page:last-child { page-break-after: auto; break-after: auto; }
+    .q-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        border-bottom: 1px solid #999;
+        padding-bottom: 4mm;
+        margin-bottom: 6mm;
+        font-size: 11pt;
+    }
+    .q-title { font-weight: 600; }
+    .q-num { color: #555; }
+    .q-img-wrap {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 0;
+    }
+    .q-img-wrap img {
+        max-width: 100%;
+        max-height: 100%;
+        width: auto;
+        height: auto;
+        object-fit: contain;
+        display: block;
+    }
+    @media screen {
+        body { background: #555; padding: 20px; }
+        .q-page {
+            background: #fff;
+            margin: 0 auto 20px;
+            padding: 12mm;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+            width: 210mm;
+            height: 297mm;
+        }
+    }
+</style>
+</head>
+<body>
+${pagesHtml}
+<script>
+    (function() {
+        const imgs = Array.from(document.images);
+        if (imgs.length === 0) { window.print(); return; }
+        let remaining = imgs.length;
+        const done = () => { if (--remaining <= 0) setTimeout(() => window.print(), 100); };
+        imgs.forEach(img => {
+            if (img.complete) done();
+            else { img.addEventListener('load', done); img.addEventListener('error', done); }
+        });
+    })();
+<\/script>
+</body>
+</html>`;
+
+        const win = window.open('', '_blank');
+        if (!win) {
+            alert('Please allow pop-ups for this site to print the question bank.');
+            return;
+        }
+        win.document.open();
+        win.document.write(html);
+        win.document.close();
     }
 
     deleteCurrentQuestionBankPhoto() {
@@ -3557,10 +3674,12 @@ class MindmapApp {
         const qbPrev = document.getElementById('qbPrev');
         const qbNext = document.getElementById('qbNext');
         const qbDelete = document.getElementById('qbDelete');
+        const qbPrint = document.getElementById('qbPrint');
         if (qbClose) qbClose.addEventListener('click', () => this.closeQuestionBankViewer());
         if (qbPrev) qbPrev.addEventListener('click', () => this.questionBankPrev());
         if (qbNext) qbNext.addEventListener('click', () => this.questionBankNext());
         if (qbDelete) qbDelete.addEventListener('click', () => this.deleteCurrentQuestionBankPhoto());
+        if (qbPrint) qbPrint.addEventListener('click', () => this.printQuestionBank());
         if (qbViewer) {
             qbViewer.addEventListener('click', (e) => {
                 if (e.target === qbViewer) this.closeQuestionBankViewer();
