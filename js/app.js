@@ -829,12 +829,13 @@ class MindmapApp {
             to.x - headLength * Math.cos(angle - Math.PI / 6),
             to.y - headLength * Math.sin(angle - Math.PI / 6)
         );
-        this.ctx.moveTo(to.x, to.y);
         this.ctx.lineTo(
             to.x - headLength * Math.cos(angle + Math.PI / 6),
             to.y - headLength * Math.sin(angle + Math.PI / 6)
         );
-        this.ctx.stroke();
+        this.ctx.closePath();
+        this.ctx.fillStyle = this.ctx.strokeStyle;
+        this.ctx.fill();
     }
 
     // Check if position is on a control point of a connection
@@ -1959,12 +1960,13 @@ class MindmapApp {
             x2 - headLength * Math.cos(angle - Math.PI / 6),
             y2 - headLength * Math.sin(angle - Math.PI / 6)
         );
-        this.ctx.moveTo(x2, y2);
         this.ctx.lineTo(
             x2 - headLength * Math.cos(angle + Math.PI / 6),
             y2 - headLength * Math.sin(angle + Math.PI / 6)
         );
-        this.ctx.stroke();
+        this.ctx.closePath();
+        this.ctx.fillStyle = this.ctx.strokeStyle;
+        this.ctx.fill();
     }
 
     drawLine(element) {
