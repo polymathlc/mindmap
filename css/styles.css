@@ -1848,3 +1848,146 @@ body {
     border-color: #6c5ce7;
     box-shadow: 0 0 0 3px rgba(108, 92, 231, 0.1);
 }
+
+/* Question Bank Viewer */
+.qb-viewer {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.9);
+    z-index: 2000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 30px;
+}
+
+.qb-title {
+    color: #fff;
+    font-size: 20px;
+    font-weight: 600;
+    margin-bottom: 16px;
+    letter-spacing: 0.3px;
+}
+
+.qb-stage {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    width: 100%;
+    flex: 1;
+    min-height: 0;
+}
+
+.qb-photo-wrap {
+    position: relative;
+    flex: 1;
+    max-width: 80vw;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.qb-photo-wrap img {
+    max-width: 100%;
+    max-height: 75vh;
+    object-fit: contain;
+    background: #fff;
+    border-radius: 6px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+}
+
+.qb-photo-wrap img[src=""] {
+    display: none;
+}
+
+.qb-empty {
+    color: rgba(255, 255, 255, 0.75);
+    font-size: 16px;
+    text-align: center;
+    padding: 40px;
+    border: 2px dashed rgba(255, 255, 255, 0.3);
+    border-radius: 12px;
+    max-width: 500px;
+}
+
+.qb-delete {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: rgba(220, 53, 69, 0.95);
+    color: #fff;
+    border: none;
+    padding: 8px 14px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.qb-delete:hover {
+    background: #dc3545;
+    transform: translateY(-1px);
+}
+
+.qb-nav {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.15);
+    color: #fff;
+    border: none;
+    font-size: 36px;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.2s;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.qb-nav:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.qb-nav:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.qb-counter {
+    color: #fff;
+    font-size: 16px;
+    font-weight: 500;
+    margin-top: 16px;
+    padding: 6px 16px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    min-width: 80px;
+    text-align: center;
+}
+
+.qb-close {
+    position: absolute;
+    top: 18px;
+    right: 22px;
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.15);
+    color: #fff;
+    border: none;
+    font-size: 28px;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.qb-close:hover {
+    background: rgba(255, 255, 255, 0.3);
+}

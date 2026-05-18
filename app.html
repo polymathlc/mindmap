@@ -44,6 +44,9 @@
                 <button id="textTool" class="tool-btn" title="Text (X)">
                     <span class="icon">T</span> Text
                 </button>
+                <button id="questionBankTool" class="tool-btn" title="Question Bank (Q)">
+                    <span class="icon">📚</span> Question Bank
+                </button>
             </div>
             <div class="toolbar-section colors">
                 <label>Fill:</label>
@@ -85,6 +88,7 @@
                 <li><kbd>A</kbd> - Arrow (click origin, click target)</li>
                 <li><kbd>L</kbd> - Line</li>
                 <li><kbd>X</kbd> - Text</li>
+                <li><kbd>Q</kbd> - Question Bank</li>
                 <li><kbd>Tab</kbd> - Add child (next level)</li>
                 <li><kbd>Enter</kbd> - Add sibling (same level)</li>
                 <li><kbd>Delete</kbd> - Delete selected</li>
@@ -586,6 +590,22 @@
         <div id="imageLightbox" class="image-lightbox" style="display: none;">
             <button id="closeLightbox" class="lightbox-close" title="Close (Esc)">&times;</button>
             <img id="lightboxImage" src="" alt="Larger view">
+        </div>
+
+        <!-- Question Bank Viewer -->
+        <div id="questionBankViewer" class="qb-viewer" style="display: none;">
+            <button id="closeQbViewer" class="qb-close" title="Close (Esc)">&times;</button>
+            <div class="qb-title" id="qbTitle">📚 Question Bank</div>
+            <div class="qb-stage">
+                <button id="qbPrev" class="qb-nav qb-nav-prev" title="Previous">&#x2039;</button>
+                <div class="qb-photo-wrap">
+                    <img id="qbImage" src="" alt="Question">
+                    <button id="qbDelete" class="qb-delete" title="Delete this picture" style="display: none;">🗑️ Delete</button>
+                    <div class="qb-empty" id="qbEmpty" style="display: none;">No pictures yet. Paste images into the Question Bank container to add them.</div>
+                </div>
+                <button id="qbNext" class="qb-nav qb-nav-next" title="Next">&#x203A;</button>
+            </div>
+            <div class="qb-counter" id="qbCounter">0 / 0</div>
         </div>
     </div>
 
