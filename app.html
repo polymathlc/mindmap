@@ -607,6 +607,22 @@
                 <button id="qbNext" class="qb-nav qb-nav-next" title="Next">&#x203A;</button>
             </div>
             <div class="qb-counter" id="qbCounter">0 / 0</div>
+            <div class="qb-answer-section" id="qbAnswerSection" style="display: none;">
+                <button type="button" id="qbShowAnswer" class="qb-show-answer" style="display: none;">Show Answer</button>
+                <div class="qb-answer-card" id="qbAnswerCard" style="display: none;">
+                    <div class="qb-answer-card-header">
+                        <span>📝 Answer Key</span>
+                        <span class="qb-answer-status" id="qbAnswerStatus"></span>
+                        <button type="button" id="qbHideAnswer" class="qb-hide-answer">Hide</button>
+                    </div>
+                    <div class="qb-answer-toolbar" id="qbAnswerToolbar" style="display: none;">
+                        <button type="button" data-cmd="bold" title="Bold (Ctrl+B)"><b>B</b></button>
+                        <button type="button" data-cmd="underline" title="Underline (Ctrl+U)"><u>U</u></button>
+                        <button type="button" data-cmd="highlight" title="Highlight">HL</button>
+                    </div>
+                    <div class="qb-answer-body" id="qbAnswerBody" data-placeholder="Type the answer key here…"></div>
+                </div>
+            </div>
         </div>
     </div>
 

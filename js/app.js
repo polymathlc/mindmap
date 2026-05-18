@@ -2722,7 +2722,8 @@ class MindmapApp {
                         data: p.data,
                         url: p.url,
                         originalWidth: p.originalWidth,
-                        originalHeight: p.originalHeight
+                        originalHeight: p.originalHeight,
+                        answer: p.answer || ''
                     }))
                     : undefined
             })),
@@ -2872,6 +2873,7 @@ class MindmapApp {
         this._qbActive = element;
         if (!element.photos) element.photos = [];
         this._qbIndex = element.photos.length > 0 ? 0 : 0;
+        this._qbAnswerShown = false;
         const viewer = document.getElementById('questionBankViewer');
         if (!viewer) return;
         viewer.style.display = 'flex';
@@ -2879,9 +2881,11 @@ class MindmapApp {
     }
 
     closeQuestionBankViewer() {
+        this._flushAnswerSave();
         const viewer = document.getElementById('questionBankViewer');
         if (viewer) viewer.style.display = 'none';
         this._qbActive = null;
+        this._qbAnswerShown = false;
     }
 
     renderQuestionBankViewer() {
@@ -2911,6 +2915,7 @@ class MindmapApp {
             next.disabled = true;
             counter.textContent = '0 / 0';
             if (print) print.disabled = true;
+            this.renderAnswerKey();
             return;
         }
         if (print) print.disabled = false;
@@ -2924,13 +2929,82 @@ class MindmapApp {
         prev.disabled = this._qbIndex === 0;
         next.disabled = this._qbIndex === total - 1;
         del.style.display = isAdmin ? 'inline-block' : 'none';
+        this.renderAnswerKey();
+    }
+
+    renderAnswerKey() {
+        const section = document.getElementById('qbAnswerSection');
+        const showBtn = document.getElementById('qbShowAnswer');
+        const card = document.getElementById('qbAnswerCard');
+        const toolbar = document.getElementById('qbAnswerToolbar');
+        const body = document.getElementById('qbAnswerBody');
+        const status = document.getElementById('qbAnswerStatus');
+        const hideBtn = document.getElementById('qbHideAnswer');
+        if (!section || !body) return;
+
+        const element = this._qbActive;
+        const photo = (element && Array.isArray(element.photos) && element.photos[this._qbIndex]) || null;
+
+        if (!photo) {
+            section.style.display = 'none';
+            return;
+        }
+
+        const isAdmin = typeof FirebaseService !== 'undefined'
+            && FirebaseService.isAdmin && FirebaseService.isAdmin();
+        const answerHtml = photo.answer || '';
+        const hasAnswer = this._answerHasContent(answerHtml);
+
+        section.style.display = 'flex';
+
+        if (body.innerHTML !== answerHtml) {
+            body.innerHTML = answerHtml;
+        }
+
+        if (isAdmin) {
+            // Admin: card is always open with editor + toolbar
+            showBtn.style.display = 'none';
+            card.style.display = 'block';
+            toolbar.style.display = 'flex';
+            hideBtn.style.display = 'none';
+            body.contentEditable = 'true';
+            if (status && !this._answerPendingSave && status.textContent !== 'Saved ✓') {
+                status.textContent = '';
+            }
+            this._qbAnswerShown = true;
+        } else {
+            body.contentEditable = 'false';
+            toolbar.style.display = 'none';
+            hideBtn.style.display = 'inline-block';
+            if (status) status.textContent = '';
+            if (!hasAnswer) {
+                showBtn.style.display = 'none';
+                card.style.display = 'none';
+                this._qbAnswerShown = false;
+            } else if (this._qbAnswerShown) {
+                showBtn.style.display = 'none';
+                card.style.display = 'block';
+            } else {
+                showBtn.style.display = 'inline-block';
+                card.style.display = 'none';
+            }
+        }
+    }
+
+    _answerHasContent(html) {
+        if (!html) return false;
+        const tmp = document.createElement('div');
+        tmp.innerHTML = html;
+        return (tmp.textContent || '').replace(/ /g, ' ').trim().length > 0;
     }
 
     questionBankNext() {
         const el = this._qbActive;
         if (!el || !el.photos) return;
         if (this._qbIndex < el.photos.length - 1) {
+            this._flushAnswerSave();
             this._qbIndex++;
+            this._qbAnswerShown = false;
             this.renderQuestionBankViewer();
         }
     }
@@ -2938,7 +3012,9 @@ class MindmapApp {
     questionBankPrev() {
         if (!this._qbActive) return;
         if (this._qbIndex > 0) {
+            this._flushAnswerSave();
             this._qbIndex--;
+            this._qbAnswerShown = false;
             this.renderQuestionBankViewer();
         }
     }
@@ -3055,6 +3131,136 @@ ${pagesHtml}
         win.document.open();
         win.document.write(html);
         win.document.close();
+    }
+
+    _onAnswerInput() {
+        const element = this._qbActive;
+        if (!element || !Array.isArray(element.photos)) return;
+        const photo = element.photos[this._qbIndex];
+        if (!photo) return;
+        const isAdmin = typeof FirebaseService !== 'undefined'
+            && FirebaseService.isAdmin && FirebaseService.isAdmin();
+        if (!isAdmin) return;
+        const body = document.getElementById('qbAnswerBody');
+        if (!body) return;
+        photo.answer = body.innerHTML;
+        this._answerPendingSave = true;
+        this._setAnswerStatus('Saving…');
+        clearTimeout(this._qbAnswerSaveTimer);
+        this._qbAnswerSaveTimer = setTimeout(() => this._flushAnswerSave(), 800);
+    }
+
+    _setAnswerStatus(text) {
+        const status = document.getElementById('qbAnswerStatus');
+        if (status) status.textContent = text;
+    }
+
+    async _flushAnswerSave() {
+        if (this._qbAnswerSaveTimer) {
+            clearTimeout(this._qbAnswerSaveTimer);
+            this._qbAnswerSaveTimer = null;
+        }
+        if (!this._answerPendingSave) return;
+        this._answerPendingSave = false;
+        // Persist to local history snapshot
+        this.saveState();
+        if (!this.currentMindmapName) {
+            this._setAnswerStatus('Saved locally — save the mindmap once to sync');
+            return;
+        }
+        try {
+            this._setAnswerStatus('Saving…');
+            await this._quietSaveMindmap();
+            this._setAnswerStatus('Saved ✓');
+            setTimeout(() => {
+                const s = document.getElementById('qbAnswerStatus');
+                if (s && s.textContent === 'Saved ✓') s.textContent = '';
+            }, 1500);
+        } catch (err) {
+            console.warn('Answer auto-save failed:', err);
+            this._setAnswerStatus('Save failed');
+        }
+    }
+
+    async _quietSaveMindmap() {
+        if (!this.currentMindmapName) return;
+        const processedElements = await Promise.all(this.elements.map(async (el, index) => {
+            const processed = { ...el, image: undefined };
+            if (el.type === 'questionBank' && Array.isArray(el.photos)) {
+                processed.photos = await Promise.all(el.photos.map(async (p, pi) => {
+                    const out = {
+                        url: p.url,
+                        originalWidth: p.originalWidth,
+                        originalHeight: p.originalHeight,
+                        answer: p.answer || ''
+                    };
+                    if (p.data && !p.url) {
+                        try {
+                            const filename = `qb_${index}_${pi}_${Date.now()}.png`;
+                            out.url = await FirebaseService.uploadImage(
+                                this.dataURLtoBlob(p.data),
+                                filename
+                            );
+                            p.url = out.url;
+                        } catch (uploadErr) {
+                            console.warn('Failed to upload qb photo during auto-save:', uploadErr);
+                        }
+                    }
+                    return out;
+                }));
+            }
+            if (el.embeddedImage) {
+                processed.embeddedImage = {
+                    position: el.embeddedImage.position,
+                    scale: el.embeddedImage.scale,
+                    originalWidth: el.embeddedImage.originalWidth,
+                    originalHeight: el.embeddedImage.originalHeight,
+                    url: el.embeddedImage.url,
+                    image: undefined
+                };
+            }
+            if (el.type === 'image') {
+                processed.imageData = undefined;
+                processed.image = undefined;
+            }
+            return processed;
+        }));
+        const data = {
+            elements: processedElements,
+            connections: this.connections.map(c => ({
+                fromIndex: this.elements.indexOf(c.from),
+                toIndex: this.elements.indexOf(c.to),
+                strokeColor: c.strokeColor,
+                strokeWidth: c.strokeWidth
+            }))
+        };
+        await FirebaseService.saveMindmap(this.currentMindmapName, data);
+    }
+
+    runAnswerCommand(cmd) {
+        const body = document.getElementById('qbAnswerBody');
+        if (!body) return;
+        body.focus();
+        if (cmd === 'highlight') {
+            // Toggle highlight: if selection is already highlighted yellow, clear it
+            const sel = window.getSelection();
+            if (sel && sel.rangeCount > 0 && !sel.isCollapsed) {
+                const range = sel.getRangeAt(0);
+                const parent = range.commonAncestorContainer.parentElement;
+                const isHighlighted = parent && parent.closest('mark, [style*="background"]');
+                if (isHighlighted) {
+                    document.execCommand('hiliteColor', false, 'transparent');
+                    document.execCommand('backColor', false, 'transparent');
+                } else {
+                    document.execCommand('hiliteColor', false, '#fff59d');
+                }
+            } else {
+                document.execCommand('hiliteColor', false, '#fff59d');
+            }
+        } else {
+            document.execCommand(cmd, false, null);
+        }
+        this._onAnswerInput();
     }
 
     deleteCurrentQuestionBankPhoto() {
@@ -3682,6 +3888,37 @@ ${pagesHtml}
         if (qbNext) qbNext.addEventListener('click', () => this.questionBankNext());
         if (qbDelete) qbDelete.addEventListener('click', () => this.deleteCurrentQuestionBankPhoto());
         if (qbPrint) qbPrint.addEventListener('click', () => this.printQuestionBank());
+
+        const qbShowAnswer = document.getElementById('qbShowAnswer');
+        const qbHideAnswer = document.getElementById('qbHideAnswer');
+        const qbAnswerToolbar = document.getElementById('qbAnswerToolbar');
+        const qbAnswerBody = document.getElementById('qbAnswerBody');
+        if (qbShowAnswer) qbShowAnswer.addEventListener('click', () => {
+            this._qbAnswerShown = true;
+            this.renderAnswerKey();
+        });
+        if (qbHideAnswer) qbHideAnswer.addEventListener('click', () => {
+            this._qbAnswerShown = false;
+            this.renderAnswerKey();
+        });
+        if (qbAnswerToolbar) qbAnswerToolbar.addEventListener('mousedown', (e) => {
+            const btn = e.target.closest('button[data-cmd]');
+            if (!btn) return;
+            // Prevent the toolbar click from stealing focus / collapsing selection
+            e.preventDefault();
+            const cmd = btn.getAttribute('data-cmd');
+            this.runAnswerCommand(cmd);
+        });
+        if (qbAnswerBody) {
+            qbAnswerBody.addEventListener('input', () => this._onAnswerInput());
+            qbAnswerBody.addEventListener('blur', () => this._flushAnswerSave());
+            qbAnswerBody.addEventListener('keydown', (e) => {
+                // Stop arrow keys from triggering question nav while typing
+                if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                    e.stopPropagation();
+                }
+            });
+        }
         if (qbViewer) {
             qbViewer.addEventListener('click', (e) => {
                 if (e.target === qbViewer) this.closeQuestionBankViewer();
@@ -4093,7 +4330,8 @@ ${pagesHtml}
                         const out = {
                             url: p.url,
                             originalWidth: p.originalWidth,
-                            originalHeight: p.originalHeight
+                            originalHeight: p.originalHeight,
+                            answer: p.answer || ''
                         };
                         if (p.data && !p.url) {
                             try {
@@ -4102,6 +4340,7 @@ ${pagesHtml}
                                     this.dataURLtoBlob(p.data),
                                     filename
                                 );
+                                p.url = out.url;
                             } catch (uploadErr) {
                                 console.warn('Failed to upload question bank photo:', uploadErr);
                             }
@@ -4258,7 +4497,8 @@ ${pagesHtml}
                         const out = {
                             url: p.url,
                             originalWidth: p.originalWidth,
-                            originalHeight: p.originalHeight
+                            originalHeight: p.originalHeight,
+                            answer: p.answer || ''
                         };
                         if (p.data && !p.url) {
                             try {
