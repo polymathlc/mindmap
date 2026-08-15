@@ -356,6 +356,29 @@ body {
     width: 100%;
 }
 
+/* Quick text colours, under the picker: the handful actually used on a
+   mindmap, one tap away, with the full picker still there for anything else. */
+.text-color-swatches {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+#elementProperties .text-color-swatches .text-swatch {
+    width: 26px;
+    height: 26px;
+    margin-top: 0;
+    padding: 0;
+    border: 1px solid rgba(0, 0, 0, 0.18);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: transform 0.12s ease;
+}
+
+#elementProperties .text-color-swatches .text-swatch:hover {
+    transform: scale(1.14);
+}
+
 #elementProperties button {
     width: 100%;
     margin-top: 10px;

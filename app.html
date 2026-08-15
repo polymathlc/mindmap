@@ -152,6 +152,18 @@
                     <input type="range" id="elementStrokeWidth" min="1" max="10" value="2">
                 </div>
                 <div class="property-group">
+                    <label>Text Color:</label>
+                    <input type="color" id="elementTextColor" value="#333333">
+                    <div class="text-color-swatches">
+                        <button class="text-swatch" data-text-color="#333333" style="background:#333333" title="Near black"></button>
+                        <button class="text-swatch" data-text-color="#C62828" style="background:#C62828" title="Red"></button>
+                        <button class="text-swatch" data-text-color="#1565C0" style="background:#1565C0" title="Blue"></button>
+                        <button class="text-swatch" data-text-color="#2E7D32" style="background:#2E7D32" title="Green"></button>
+                        <button class="text-swatch" data-text-color="#6A1B9A" style="background:#6A1B9A" title="Purple"></button>
+                        <button class="text-swatch" data-text-color="#FFFFFF" style="background:#FFFFFF" title="White"></button>
+                    </div>
+                </div>
+                <div class="property-group">
                     <label>Font Size:</label>
                     <input type="number" id="elementFontSize" min="8" max="72" value="14">
                 </div>
@@ -184,6 +196,10 @@
                     </div>
                     <button id="viewLargerImage" class="action-btn primary" style="margin-top: 8px; width: 100%;">🔍 View Larger</button>
                     <button id="removeImage" class="action-btn" style="margin-top: 8px; width: 100%;">🗑️ Remove Image</button>
+                </div>
+                <div class="property-group">
+                    <label>Link:</label>
+                    <button id="elementLink" class="action-btn" style="width: 100%;" title="Attach a web address — a small chain shows on the shape, and clicking it opens the page">🔗 Add Link</button>
                 </div>
                 <button id="deleteElement" class="action-btn danger">Delete Element</button>
             </div>

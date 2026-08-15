@@ -59,6 +59,10 @@ class MindmapApp {
         this.strokeWidth = 2;
         this.fontSize = 14;
         this.fontFamily = 'Arial';
+        // The words in a shape have a colour of their own, separate from the
+        // fill and the outline. Kept in step with the Ans Key app's board
+        // (polymathlc/anskey), which carries the same field.
+        this.textColor = '#333333';
 
         // Available font families
         this.availableFonts = [
@@ -203,6 +207,15 @@ class MindmapApp {
     }
 
     handleSelectMouseDown(pos, e) {
+        // The link badge comes before anything else — that is the whole point
+        // of putting it there. Ctrl/Cmd-click anywhere on the shape does the
+        // same, for when the badge is too small to aim at.
+        const badged = this.getLinkAtPosition(pos);
+        if (badged) {
+            this.openElementLink(badged);
+            return;
+        }
+
         // Check for resize handles on selected elements
         const handle = this.getResizeHandle(pos);
         if (handle) {
@@ -265,6 +278,11 @@ class MindmapApp {
         const clickedElement = this.getElementAtPosition(pos);
 
         if (clickedElement) {
+            if ((e.ctrlKey || e.metaKey) && clickedElement.link) {
+                this.openElementLink(clickedElement);
+                return;
+            }
+
             // Clear connection selection when clicking on element
             this.selectedConnection = null;
             
@@ -1292,6 +1310,7 @@ class MindmapApp {
             text: '',
             fontSize: this.fontSize,
             fontFamily: this.fontFamily,
+            textColor: this.textColor,
             textAlign: 'center'
         };
 
@@ -1752,6 +1771,69 @@ class MindmapApp {
         this.ctx.restore();
     }
 
+    // A shape or picture carrying a link shows a small chain in its top-right
+    // corner. Kept in step with the Ans Key app's board (polymathlc/anskey),
+    // which draws and hit-tests the badge exactly the same way.
+    getLinkRect(element) {
+        if (!element || !element.link) return null;
+        if (element.type === 'arrow' || element.type === 'line') return null;
+        const bounds = this.getElementBounds(element);
+        const size = Math.max(15, Math.min(22, 20 / this.zoom));
+        const inset = 4 / this.zoom;
+        return { x: bounds.x + bounds.width - size - inset, y: bounds.y + inset, width: size, height: size };
+    }
+
+    getLinkAtPosition(pos) {
+        for (let i = this.elements.length - 1; i >= 0; i--) {
+            const rect = this.getLinkRect(this.elements[i]);
+            if (rect && pos.x >= rect.x && pos.x <= rect.x + rect.width &&
+                pos.y >= rect.y && pos.y <= rect.y + rect.height) {
+                return this.elements[i];
+            }
+        }
+        return null;
+    }
+
+    drawLinkBadge(element) {
+        const rect = this.getLinkRect(element);
+        if (!rect) return;
+        this.ctx.save();
+        this.ctx.beginPath();
+        this.ctx.roundRect(rect.x, rect.y, rect.width, rect.height, rect.width * 0.3);
+        this.ctx.fillStyle = 'rgba(45, 45, 45, 0.78)';
+        this.ctx.fill();
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.font = `${rect.height * 0.62}px sans-serif`;
+        this.ctx.textAlign = 'center';
+        this.ctx.textBaseline = 'middle';
+        this.ctx.fillText('\u{1F517}', rect.x + rect.width / 2, rect.y + rect.height / 2 + rect.height * 0.04);
+        this.ctx.restore();
+    }
+
+    openElementLink(element) {
+        if (!element || !element.link) return;
+        window.open(element.link, '_blank', 'noopener');
+    }
+
+    // Ask for the link on the selected shape. An empty answer takes it off.
+    setElementLink() {
+        if (this.selectedElements.length !== 1) return;
+        const element = this.selectedElements[0];
+        if (element.type === 'arrow' || element.type === 'line') return;
+        let value = window.prompt('Link for this shape — paste a web address, or leave it empty to remove:', element.link || '');
+        if (value === null) return;
+        value = value.trim();
+        if (!value) {
+            delete element.link;
+        } else {
+            if (!/^https?:\/\//i.test(value)) value = 'https://' + value;
+            element.link = value;
+        }
+        this.saveState();
+        this.render();
+        this.updatePropertyPanel();
+    }
+
     drawElement(element) {
         this.ctx.save();
         this.ctx.fillStyle = element.fillColor || this.fillColor;
@@ -1787,6 +1869,8 @@ class MindmapApp {
                 this.drawQuestionBank(element);
                 break;
         }
+
+        this.drawLinkBadge(element);
 
         this.ctx.restore();
     }
@@ -2048,7 +2132,7 @@ class MindmapApp {
 
     // Render text with crisp quality at any zoom level
     // This renders text outside the zoom transform for pixel-perfect clarity
-    renderCrispText(lines, centerX, centerY, fontSize, maxHeight, padding = 10, fontFamily = 'Arial') {
+    renderCrispText(lines, centerX, centerY, fontSize, maxHeight, padding = 10, fontFamily = 'Arial', textColor = '#333333') {
         if (lines.length === 0) return;
 
         // Get current DPR (default to 1 for export context)
@@ -2065,7 +2149,7 @@ class MindmapApp {
         this.ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset to identity matrix
 
         // Set text properties with scaled font size
-        this.ctx.fillStyle = '#333333';
+        this.ctx.fillStyle = textColor || '#333333';
         this.ctx.font = `600 ${screenFontSize}px "${fontFamily}", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
         this.ctx.textAlign = 'center';
         this.ctx.textBaseline = 'middle';
@@ -2112,7 +2196,7 @@ class MindmapApp {
             // Render crisp text at center of element
             const centerX = x + width / 2;
             const centerY = y + height / 2;
-            this.renderCrispText(lines, centerX, centerY, optimalFontSize, height, padding, font);
+            this.renderCrispText(lines, centerX, centerY, optimalFontSize, height, padding, font, element.textColor);
         }
     }
 
@@ -2180,7 +2264,7 @@ class MindmapApp {
             }
         }
 
-        this.renderCrispText(lines, centerX, centerY, optimalFontSize, height, padding, fontFamily);
+        this.renderCrispText(lines, centerX, centerY, optimalFontSize, height, padding, fontFamily, element.textColor);
     }
 
     // Get embedded image dimensions scaled to fit shape
@@ -2506,8 +2590,29 @@ class MindmapApp {
                 break;
         }
 
+        // A standalone picture is never stretched out of shape: dragging a
+        // corner keeps its proportions with no Shift held, and dragging a side
+        // takes the other side with it. Kept in step with the Ans Key app's
+        // board (polymathlc/anskey). A shape with a picture *inside* it is left
+        // free to be reshaped — getEmbeddedImageDimensions already keeps that
+        // picture in proportion within whatever box it is given.
+        const isPicture = element.type === 'image';
+        if (isPicture && originalRatio > 0 && isFinite(originalRatio)) {
+            const corner = ['nw', 'ne', 'se', 'sw'].includes(handle.type);
+            if (corner) {
+                if (newWidth / newHeight > originalRatio) newWidth = newHeight * originalRatio;
+                else newHeight = newWidth / originalRatio;
+            } else if (handle.type === 'e' || handle.type === 'w') {
+                newHeight = newWidth / originalRatio;
+            } else {
+                newWidth = newHeight * originalRatio;
+            }
+            if (handle.type.includes('w')) newX = bounds.x + bounds.width - newWidth;
+            if (handle.type.includes('n')) newY = bounds.y + bounds.height - newHeight;
+        }
+
         // Shift key: maintain aspect ratio (proportional resize)
-        if (shiftKey && ['nw', 'ne', 'se', 'sw'].includes(handle.type)) {
+        if (!isPicture && shiftKey && ['nw', 'ne', 'se', 'sw'].includes(handle.type)) {
             // Use the larger dimension change to determine scale
             const widthRatio = newWidth / element.width;
             const heightRatio = newHeight / element.height;
@@ -3806,6 +3911,35 @@ ${pagesHtml}
             this.saveState();
         });
 
+        // Text colour: the picker, plus a row of quick swatches for the
+        // handful of colours actually used on a mindmap.
+        const elementTextColor = document.getElementById('elementTextColor');
+        if (elementTextColor) {
+            const applyTextColor = (value, commit) => {
+                this.textColor = value;
+                this.selectedElements.forEach(el => {
+                    if (el.type === 'arrow' || el.type === 'line') return;
+                    el.textColor = value;
+                });
+                this.render();
+                if (commit) this.saveState();
+            };
+            elementTextColor.addEventListener('input', (e) => applyTextColor(e.target.value, false));
+            elementTextColor.addEventListener('change', (e) => applyTextColor(e.target.value, true));
+            document.querySelectorAll('.text-swatch').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const value = btn.getAttribute('data-text-color');
+                    elementTextColor.value = value;
+                    applyTextColor(value, true);
+                });
+            });
+        }
+
+        const elementLink = document.getElementById('elementLink');
+        if (elementLink) {
+            elementLink.addEventListener('click', () => this.setElementLink());
+        }
+
         // Font family selector
         const elementFontFamily = document.getElementById('elementFontFamily');
         elementFontFamily.addEventListener('change', (e) => {
@@ -3976,6 +4110,17 @@ ${pagesHtml}
         document.getElementById('elementStrokeWidth').value = element.strokeWidth || 2;
         document.getElementById('elementFontSize').value = element.fontSize || 14;
         document.getElementById('elementFontFamily').value = element.fontFamily || 'Arial';
+
+        const textColorInput = document.getElementById('elementTextColor');
+        if (textColorInput) textColorInput.value = element.textColor || '#333333';
+
+        const linkBtn = document.getElementById('elementLink');
+        if (linkBtn) {
+            const linkable = element.type !== 'arrow' && element.type !== 'line';
+            linkBtn.parentElement.style.display = linkable ? '' : 'none';
+            linkBtn.textContent = element.link ? '🔗 Edit Link' : '🔗 Add Link';
+            linkBtn.title = element.link || 'Attach a web address — a small chain shows on the shape, and clicking it opens the page';
+        }
 
         // Show/hide image position controls
         if (element.embeddedImage && imagePositionGroup) {
