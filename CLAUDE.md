@@ -125,6 +125,20 @@ compared with the teacher's model answer.
   something a child's phone downloads to answer one question — the card reads ONE document
   by id. The picker lists at most 200 rows and says so; the search box (every word must
   match) and the topic dropdown (built from the bank itself) are how the rest are reached.
+- **THE SEARCH READS THE TAGS** (v1.2.0 — `tagsOf` / `searchText` / `tagsIn` in
+  `js/cer-questions.js`, `renderCerPickTags` and the `#cerPickTags` row in `app.js`). The
+  portal's teacher files a question under free-text `tags` as well as its topic, and
+  "expansion" typed here has to find every question TAGGED expansion — a question about a jar
+  lid loosening under hot water never says the word anywhere in its wording. `searchText(s)`
+  is the ONE place a summary becomes searchable text, and the tags are in it beside the title,
+  the topic and the wording; `tagsOf` mirrors the portal's own `qTagList` (case-insensitive
+  dedupe, a bare number dropped, clipped and capped) so the two apps agree about what a tag
+  is. The tag row under the search box is built from `tagsIn` — the tags the bank really
+  uses, most-used first — because a tag search is only useful if the teacher can see what
+  the tags ARE; one tap types the tag into the box, a second clears it, and the row is ONE
+  delegated listener because it is rebuilt on every render. Every failure here is silent:
+  the picker still lists questions and still says "N of M", it simply leaves the tagged ones
+  out.
 - **The portal link is RELATIVE** (`CER_PORTAL_URL` = `../cer/`). The apps are sibling
   folders on one GitHub Pages host, and an absolute address works until the day the centre
   moves domain.

@@ -67,7 +67,7 @@
                 <button id="exportBtn" class="action-btn" title="Export as PNG">📷 Export</button>
             </div>
             <div class="toolbar-section user-section">
-                <span id="versionTag" class="version-tag" title="Mindmap version">v1.1.0</span>
+                <span id="versionTag" class="version-tag" title="Mindmap version">v1.2.0</span>
                 <span id="userStatus">Not signed in</span>
                 <button id="assignmentsBtn" class="action-btn assignments-btn" style="display: none;">📋 Assignments</button>
                 <button id="profileBtn" class="action-btn profile-btn" style="display: none;">👤 Profile</button>
@@ -604,10 +604,11 @@
                 <h3>❓ Attach a question from the Science Learning Portal</h3>
                 <p class="cq-sub">Pick questions from the portal’s question bank. Anyone who opens this mindmap taps the ❓ badge on the shape to answer them right here, and their answers are recorded in the portal’s usage tracker under <b>Mindmap</b>.</p>
                 <div class="cq-filters">
-                    <input type="search" id="cerPickSearch" placeholder="Search the title, topic or wording…" autocomplete="off">
+                    <input type="search" id="cerPickSearch" placeholder="Search the title, topic, tags or wording — e.g. expansion" autocomplete="off">
                     <select id="cerPickTopic"><option value="">All topics</option></select>
                     <button type="button" id="cerPickReload" class="action-btn" title="Read the bank again">🔄</button>
                 </div>
+                <div id="cerPickTags" class="cq-tags" style="display: none;"></div>
                 <div id="cerPickStatus" class="cq-status"></div>
                 <div id="cerPickList" class="cq-list"></div>
                 <div class="modal-actions cq-actions">

@@ -246,6 +246,64 @@ test('summary + search: every word must match; topic narrows; the stem is clippe
   eq(C.topicsOf(list), [{ topic: 'Heat', count: 1 }, { topic: 'Water', count: 1 }]);
 });
 
+// ---- tags are searched too -------------------------------------------------
+// The portal's teacher files questions under free-text tags, and "expansion"
+// typed into the picker has to find every question TAGGED expansion — the
+// wording of a question about a lid loosening under hot water never says the
+// word. Every failure here is silent: the picker still lists questions and
+// still says "N of M", it simply leaves the tagged ones out.
+test('tags: normalised like the portal’s own qTagList', () => {
+  eq(C.tagsOf({ tags: [' Expansion ', 'expansion', 'EXPANSION', 'Heat  gain', '', null, '12', 'x'.repeat(60)] }),
+     ['Expansion', 'Heat gain', 'x'.repeat(48)],
+     'case-insensitive dedupe, whitespace folded, a bare number dropped, a tag clipped');
+  eq(C.tagsOf({ tags: 'not a list' }), [], 'a string is not a tag list');
+  eq(C.tagsOf({}), [], 'no field, no tags');
+  eq(C.tagsOf(null), []);
+  const many = Array.from({ length: 40 }, (_, i) => 'tag' + i);
+  eq(C.tagsOf({ tags: many }).length, 24, 'capped at TAG_MAX_COUNT');
+});
+
+test('search: a word that only appears in a TAG still finds the question', () => {
+  const lid = C.summary({ id: 'q7', title: 'The jar lid', topic: 'Heat', tags: ['Expansion', 'contraction'],
+    blocks: [{ type: 'text', content: '<p>Why does running the metal lid under hot water make it easier to open?</p>' }] });
+  const plain = C.summary({ id: 'q8', title: 'Which object gains heat', topic: 'Heat',
+    blocks: [{ type: 'text', content: '<p>A cup of hot tea is left on the table.</p>' }] });
+  eq(lid.tags, ['Expansion', 'contraction'], 'the summary carries the tags');
+  eq(plain.tags, [], 'a question with no tags carries none, never undefined');
+  const list = [lid, plain];
+  eq(C.search(list, 'expansion', '').map(x => x.id), ['q7'], 'found by tag alone — the wording never says it');
+  eq(C.search(list, 'EXPANSION', '').map(x => x.id), ['q7'], 'case-insensitive on a tag too');
+  eq(C.search(list, 'expansion lid', '').map(x => x.id), ['q7'], 'a tag word and a wording word together');
+  eq(C.search(list, 'expansion tea', '').map(x => x.id), [], 'every word must still match: an OR would return both');
+  eq(C.search(list, 'heat', '').map(x => x.id), ['q7', 'q8'], 'the topic still matches as before');
+  eq(C.search(list, 'expansion', 'Water').map(x => x.id), [], 'the topic dropdown still narrows on top');
+  ok(C.searchText(lid).indexOf('expansion') >= 0 && C.searchText(lid).indexOf('contraction') >= 0, 'searchText carries every tag');
+  eq(C.searchText(null), '');
+});
+
+test('tagsIn: the bank’s tags, most-used first, one entry per spelling', () => {
+  const list = [
+    C.summary({ id: 'a', tags: ['Expansion', 'Heat gain'] }),
+    C.summary({ id: 'b', tags: ['expansion'] }),
+    C.summary({ id: 'c', tags: ['Contraction'] }),
+    C.summary({ id: 'd' }),
+  ];
+  eq(C.tagsIn(list), [{ tag: 'Expansion', count: 2 }, { tag: 'Contraction', count: 1 }, { tag: 'Heat gain', count: 1 }],
+     'count wins, then the name; the first spelling seen is the label');
+  eq(C.tagsIn([]), []);
+  eq(C.tagsIn(null), []);
+});
+
+// ---- the picker's markup carries the tags ----------------------------------
+test('app.js: the picker rows show the tags, the tag row is delegated, and the box says tags are searched', () => {
+  ok(appJs.indexOf('cq-row-tags') >= 0, 'a picker row prints its tags');
+  ok(appJs.indexOf("closest('button[data-cer-tag]')") >= 0, 'the tag row is one delegated listener, not a listener per chip');
+  ok(/renderCerPickTags\(all\)/.test(appJs), 'the tag row is rebuilt on every picker render');
+  ok(/CerQuestions\.tagsIn\(/.test(appJs), 'the tag row is built from the ONE tally');
+  ok(/placeholder="[^"]*tags[^"]*"/.test(appHtml), 'the search box says it searches tags');
+  ok(appHtml.indexOf('id="cerPickTags"') >= 0, 'the tag row has somewhere to render');
+});
+
 // ---- constants shared with the portal ------------------------------------------
 test('the collection names and the attempt mode are the portal’s own', () => {
   eq(C.CER_CONFIG_COL + '/' + C.CER_CONFIG_DOC, 'config/admin');
