@@ -2190,3 +2190,232 @@ body {
     padding: 0 2px;
     border-radius: 2px;
 }
+
+/* =====================================================================
+   ❓ Questions from the Science Learning Portal
+   The properties-panel group, the teacher's picker and the student's card.
+   Everything here is breathing-space first: a question is read, not
+   scanned, so the card is wide, padded and never edge-to-edge.
+   ===================================================================== */
+.version-tag {
+    font-size: 11px;
+    color: #8a8f98;
+    background: #f1f3f4;
+    border: 1px solid #e2e5e9;
+    border-radius: 999px;
+    padding: 2px 8px;
+    letter-spacing: 0.02em;
+}
+
+.cer-list { display: flex; flex-direction: column; gap: 6px; }
+.cer-row { display: flex; align-items: stretch; gap: 6px; }
+.cer-row-open {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    padding: 8px 10px;
+    background: #f5f3ff;
+    border: 1px solid #ddd6fe;
+    border-radius: 8px;
+    color: #333;
+    cursor: pointer;
+    text-align: left;
+    font-size: 12px;
+    line-height: 1.35;
+}
+.cer-row-open:hover { background: #ede9fe; border-color: #6c5ce7; }
+.cer-row-kind { flex: 0 0 auto; }
+.cer-row-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+.cer-row-topic { flex: 0 0 auto; font-size: 10px; color: #6c5ce7; background: #fff; border: 1px solid #ddd6fe; border-radius: 999px; padding: 1px 7px; max-width: 42%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cer-row-remove {
+    flex: 0 0 auto;
+    width: 30px;
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    color: #c0392b;
+    cursor: pointer;
+    font-size: 13px;
+}
+.cer-row-remove:hover { background: #fdecea; border-color: #e74c3c; }
+.cer-empty { font-size: 12px; color: #888; margin: 2px 0 0; line-height: 1.4; }
+.cer-try-btn { background: linear-gradient(180deg, #6c5ce7 0%, #5849be 100%); border-color: #5849be; color: #fff; }
+.cer-try-btn:hover { background: linear-gradient(180deg, #7d6ef0 0%, #6c5ce7 100%); }
+
+/* The two windows share one frame. .modal-content caps at 500px, which is
+   right for a save dialog and cramped for a question with a diagram, so the
+   frame is widened here — both classes, because .modal-content is declared
+   above and a single class would lose to it. */
+.modal-content.cq-modal {
+    position: relative;
+    max-width: 720px;
+    width: min(720px, calc(100vw - 32px));
+    max-height: 86vh;
+    padding: 28px 30px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    overflow: hidden;
+}
+.modal-content.cq-modal h3 { margin-bottom: 0; padding-bottom: 10px; }
+.cq-sub { font-size: 13px; color: #666; line-height: 1.55; margin: -4px 0 0; }
+.cq-filters { display: flex; gap: 8px; align-items: center; }
+.cq-filters input[type="search"] {
+    flex: 1;
+    padding: 10px 12px;
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    font-size: 14px;
+    color: #333;
+}
+.cq-filters input[type="search"]:focus { outline: none; border-color: #6c5ce7; background: #fff; }
+.cq-filters select {
+    max-width: 44%;
+    padding: 10px 12px;
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    font-size: 13px;
+    color: #333;
+}
+.cq-status { font-size: 12px; color: #777; line-height: 1.5; min-height: 1.2em; }
+.cq-hint { font-size: 13px; color: #888; line-height: 1.55; padding: 10px 2px; }
+.cq-error { color: #b03a2e; }
+
+/* The picker's list is the ONE thing that scrolls; the search box and the
+   buttons stay put. min-height: 0 is what lets a flex child shrink below its
+   content so overflow has something to do. */
+.cq-list {
+    flex: 1;
+    min-height: 120px;
+    overflow-y: auto;
+    border: 1px solid #e9ecef;
+    border-radius: 10px;
+    padding: 6px;
+    background: #fbfbfc;
+}
+.cq-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    border: 1px solid transparent;
+}
+.cq-row:hover { background: #f5f3ff; border-color: #ddd6fe; }
+.cq-row input[type="checkbox"] { margin-top: 4px; flex: 0 0 auto; width: 16px; height: 16px; accent-color: #6c5ce7; }
+.cq-row-pinned { opacity: 0.6; }
+.cq-row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.cq-row-title { font-size: 14px; font-weight: 500; color: #222; line-height: 1.4; }
+.cq-row-meta { font-size: 11.5px; color: #6c5ce7; }
+.cq-row-stem { font-size: 12.5px; color: #666; line-height: 1.5; }
+.cq-row-eye {
+    flex: 0 0 auto;
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 5px 9px;
+    cursor: pointer;
+    font-size: 14px;
+}
+.cq-row-eye:hover { border-color: #6c5ce7; }
+.cq-actions { align-items: center; margin-top: 4px; }
+.cq-actions .action-btn.primary { width: auto; }
+.cq-count { margin-right: auto; font-size: 12px; color: #777; }
+
+/* The card. */
+.cq-head { display: flex; flex-direction: column; gap: 6px; }
+.cq-kicker { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: #6c5ce7; font-weight: 600; }
+.cq-meta { font-size: 12px; color: #777; }
+.cq-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    font-size: 15px;
+    line-height: 1.65;
+    color: #222;
+    padding: 4px 2px;
+}
+.cq-body p { margin: 0 0 10px; }
+.cq-body img { max-width: 100%; height: auto; border-radius: 8px; }
+.cq-text { margin: 0 0 12px; }
+.cq-partline { margin-top: 14px; }
+.cq-part { font-weight: 700; color: #6c5ce7; margin-right: 4px; }
+.cq-figure { margin: 12px 0 16px; text-align: center; }
+.cq-figure img { border: 1px solid #e9ecef; }
+.cq-figure figcaption { font-size: 12px; color: #777; margin-top: 6px; }
+.cq-mcq { display: flex; flex-direction: column; gap: 8px; margin: 12px 0 14px; }
+.cq-opt {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 14px;
+    border: 1px solid #dee2e6;
+    border-radius: 10px;
+    background: #fff;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease;
+}
+.cq-opt:hover { border-color: #6c5ce7; }
+.cq-opt input[type="radio"] { margin-top: 5px; flex: 0 0 auto; accent-color: #6c5ce7; }
+.cq-optnum { font-weight: 700; color: #555; flex: 0 0 auto; }
+.cq-opttext { flex: 1; }
+.cq-opt.cq-picked { border-color: #6c5ce7; background: #f5f3ff; }
+.cq-opt.cq-right { border-color: #2e7d32; background: #e8f5e9; }
+.cq-opt.cq-wrong { border-color: #c62828; background: #fdecea; }
+.cq-blank {
+    display: inline-block;
+    min-width: 8ch;
+    border-bottom: 2px solid #555;
+    height: 1.2em;
+    vertical-align: bottom;
+    margin: 0 3px;
+}
+.cq-blank-long { min-width: 22ch; }
+.cq-blank-shown { min-width: 0; padding: 0 6px; border-bottom-color: #2e7d32; color: #2e7d32; font-weight: 600; background: #e8f5e9; border-radius: 4px 4px 0 0; }
+.cq-tablewrap { overflow-x: auto; margin: 10px 0 14px; }
+.cq-table { border-collapse: collapse; width: 100%; font-size: 14px; }
+.cq-table td, .cq-table th { border: 1px solid #cfd4da; padding: 7px 10px; text-align: left; vertical-align: top; }
+.cq-table th { background: #f1f3f4; font-weight: 600; }
+.cq-answer, .cq-explain {
+    margin: 14px 0 0;
+    padding: 14px 16px;
+    border-radius: 10px;
+    line-height: 1.6;
+}
+.cq-answer { background: #e8f5e9; border: 1px solid #c8e6c9; }
+.cq-explain { background: #fff8e1; border: 1px solid #ffe082; }
+.cq-answer-head { font-size: 12px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; margin-bottom: 6px; color: #444; }
+.cq-answer-area { display: flex; flex-direction: column; gap: 6px; }
+.cq-written-label { font-size: 12px; color: #666; }
+.cq-written {
+    width: 100%;
+    padding: 10px 12px;
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    font: inherit;
+    font-size: 14px;
+    line-height: 1.5;
+    color: #222;
+    resize: vertical;
+}
+.cq-written:focus { outline: none; border-color: #6c5ce7; background: #fff; }
+.cq-result { padding: 12px 16px; border-radius: 10px; font-size: 14px; line-height: 1.5; }
+.cq-result-right { background: #e8f5e9; border: 1px solid #a5d6a7; color: #1b5e20; }
+.cq-result-wrong { background: #fdecea; border: 1px solid #f5b7b1; color: #7b241c; }
+.cq-result-neutral { background: #f5f3ff; border: 1px solid #ddd6fe; color: #4b3fa8; }
+.cq-foot { font-size: 12px; text-align: right; }
+.cq-foot a { color: #6c5ce7; text-decoration: none; }
+.cq-foot a:hover { text-decoration: underline; }
+
+@media (max-width: 640px) {
+    .modal-content.cq-modal { padding: 20px 16px 16px; max-height: 92vh; }
+    .cq-filters { flex-wrap: wrap; }
+    .cq-filters select { max-width: 100%; flex: 1; }
+    .cq-body { font-size: 14px; }
+}
