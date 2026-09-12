@@ -1,6 +1,11 @@
 // Mindmap Application
 // Main application logic for the mindmap canvas
 
+// The build that is running. It renders in the toolbar (#versionTag) so the
+// user can check the number on screen against the number reported in chat and
+// know whether a deploy went through. Bump it on EVERY change.
+const APP_VERSION = 'v1.1.0';
+
 class MindmapApp {
     constructor() {
         this.canvas = document.getElementById('mindmapCanvas');
@@ -110,10 +115,20 @@ class MindmapApp {
         this.setupToolbar();
         this.setupPropertyPanel();
         this.setupModals();
+        this.setupCerQuestions();
         this.setupAuth();
         this.setupTutorial();
+        this.renderVersionTag();
         this.saveState();
         this.render();
+    }
+
+    renderVersionTag() {
+        const tag = document.getElementById('versionTag');
+        if (tag) {
+            tag.textContent = APP_VERSION;
+            tag.title = 'Mindmap ' + APP_VERSION;
+        }
     }
 
     // Get a random pastel color
@@ -207,9 +222,17 @@ class MindmapApp {
     }
 
     handleSelectMouseDown(pos, e) {
-        // The link badge comes before anything else — that is the whole point
-        // of putting it there. Ctrl/Cmd-click anywhere on the shape does the
-        // same, for when the badge is too small to aim at.
+        // The two badges come before anything else — that is the whole point
+        // of putting them there. The ❓ question badge is tested first: a
+        // student opening a question is the one thing on this canvas that
+        // must never turn into a drag.
+        const asked = this.getQuestionBadgeAtPosition(pos);
+        if (asked) {
+            this.openCerQuestion(asked, 0);
+            return;
+        }
+        // Ctrl/Cmd-click anywhere on the shape opens its link too, for when
+        // the badge is too small to aim at.
         const badged = this.getLinkAtPosition(pos);
         if (badged) {
             this.openElementLink(badged);
@@ -605,6 +628,9 @@ class MindmapApp {
 
     handleDoubleClick(e) {
         const pos = this.getMousePos(e);
+        // A double-tap on the ❓ badge is two clicks on the question, not a
+        // request to edit the shape's text underneath it.
+        if (this.getQuestionBadgeAtPosition(pos)) return;
         const element = this.getElementAtPosition(pos);
 
         if (element && element.type !== 'arrow' && element.type !== 'line') {
@@ -975,6 +1001,15 @@ class MindmapApp {
         // Don't handle canvas shortcuts when Question Bank viewer is open
         const qbViewer = document.getElementById('questionBankViewer');
         if (qbViewer && qbViewer.style.display !== 'none') {
+            return;
+        }
+
+        // …nor while a Science-portal question card or its picker is open: a
+        // student typing a written answer, or the teacher typing a search,
+        // must not have "r" put the rectangle tool in their hand. Escape
+        // closes whichever is on top.
+        if (this.cerModalOpen()) {
+            if (e.key === 'Escape') this.closeCerModals();
             return;
         }
 
@@ -1780,7 +1815,66 @@ class MindmapApp {
         const bounds = this.getElementBounds(element);
         const size = Math.max(15, Math.min(22, 20 / this.zoom));
         const inset = 4 / this.zoom;
+        // The ❓ question badge owns the top-right corner when the shape has
+        // one, so the chain steps one badge to the left of it rather than the
+        // two being drawn on top of each other.
+        const shift = this.getQuestionRefs(element).length ? size + inset : 0;
+        return { x: bounds.x + bounds.width - size - inset - shift, y: bounds.y + inset, width: size, height: size };
+    }
+
+    // ---- ❓ QUESTIONS FROM THE SCIENCE LEARNING PORTAL — the badge ----------
+    // A shape carrying one or more pinned questions wears a violet ❓ in its
+    // top-right corner (with a count when there are several). It is drawn and
+    // hit-tested exactly the way the link badge is, and the badge is tested
+    // BEFORE the shape, so tapping it opens the question rather than starting
+    // a drag. Arrows and lines carry no questions — there is no corner to put
+    // a badge on.
+    getQuestionRefs(element) {
+        if (!element || !window.CerQuestions) return [];
+        return CerQuestions.normaliseRefs(element.questions);
+    }
+
+    getQuestionBadgeRect(element) {
+        if (!element || element.type === 'arrow' || element.type === 'line') return null;
+        if (!this.getQuestionRefs(element).length) return null;
+        const bounds = this.getElementBounds(element);
+        const size = Math.max(15, Math.min(22, 20 / this.zoom));
+        const inset = 4 / this.zoom;
         return { x: bounds.x + bounds.width - size - inset, y: bounds.y + inset, width: size, height: size };
+    }
+
+    getQuestionBadgeAtPosition(pos) {
+        for (let i = this.elements.length - 1; i >= 0; i--) {
+            const rect = this.getQuestionBadgeRect(this.elements[i]);
+            if (rect && pos.x >= rect.x && pos.x <= rect.x + rect.width &&
+                pos.y >= rect.y && pos.y <= rect.y + rect.height) {
+                return this.elements[i];
+            }
+        }
+        return null;
+    }
+
+    drawQuestionBadge(element) {
+        const rect = this.getQuestionBadgeRect(element);
+        if (!rect) return;
+        const count = this.getQuestionRefs(element).length;
+        this.ctx.save();
+        this.ctx.beginPath();
+        this.ctx.roundRect(rect.x, rect.y, rect.width, rect.height, rect.width * 0.3);
+        this.ctx.fillStyle = 'rgba(108, 92, 231, 0.92)';
+        this.ctx.fill();
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.textAlign = 'center';
+        this.ctx.textBaseline = 'middle';
+        if (count > 1) {
+            // "?2" — the mark and how many, small enough to stay in the badge.
+            this.ctx.font = `700 ${rect.height * 0.5}px sans-serif`;
+            this.ctx.fillText('?' + count, rect.x + rect.width / 2, rect.y + rect.height / 2 + rect.height * 0.04);
+        } else {
+            this.ctx.font = `700 ${rect.height * 0.66}px sans-serif`;
+            this.ctx.fillText('?', rect.x + rect.width / 2, rect.y + rect.height / 2 + rect.height * 0.04);
+        }
+        this.ctx.restore();
     }
 
     getLinkAtPosition(pos) {
@@ -1871,6 +1965,7 @@ class MindmapApp {
         }
 
         this.drawLinkBadge(element);
+        this.drawQuestionBadge(element);
 
         this.ctx.restore();
     }
@@ -2644,6 +2739,11 @@ class MindmapApp {
     }
 
     updateCursor(pos) {
+        // Over either badge the hand says "this opens something".
+        if (this.currentTool === 'select' && (this.getQuestionBadgeAtPosition(pos) || this.getLinkAtPosition(pos))) {
+            this.canvas.style.cursor = 'pointer';
+            return;
+        }
         const handle = this.getResizeHandle(pos);
         if (handle) {
             const type = handle.handle.type;
@@ -3940,6 +4040,24 @@ ${pagesHtml}
             elementLink.addEventListener('click', () => this.setElementLink());
         }
 
+        // ❓ Questions from the Science portal. The attach button is the
+        // teacher's; ▶ Try is everyone's. The list of pinned questions is
+        // delegated, because it is rebuilt on every selection change.
+        const cerAttach = document.getElementById('elementCerAttach');
+        if (cerAttach) cerAttach.addEventListener('click', () => this.openCerPicker());
+        const cerTry = document.getElementById('elementCerTry');
+        if (cerTry) cerTry.addEventListener('click', () => {
+            if (this.selectedElements.length === 1) this.openCerQuestion(this.selectedElements[0], 0);
+        });
+        const cerList = document.getElementById('elementCerList');
+        if (cerList) cerList.addEventListener('click', (e) => {
+            const btn = e.target.closest('button[data-cer-act]');
+            if (!btn || this.selectedElements.length !== 1) return;
+            const idx = parseInt(btn.getAttribute('data-cer-index'), 10);
+            if (btn.getAttribute('data-cer-act') === 'remove') this.removeCerQuestion(this.selectedElements[0], idx);
+            else if (btn.getAttribute('data-cer-act') === 'open') this.openCerQuestion(this.selectedElements[0], idx);
+        });
+
         // Font family selector
         const elementFontFamily = document.getElementById('elementFontFamily');
         elementFontFamily.addEventListener('change', (e) => {
@@ -4121,6 +4239,8 @@ ${pagesHtml}
             linkBtn.textContent = element.link ? '🔗 Edit Link' : '🔗 Add Link';
             linkBtn.title = element.link || 'Attach a web address — a small chain shows on the shape, and clicking it opens the page';
         }
+
+        this.renderCerPropertyGroup(element);
 
         // Show/hide image position controls
         if (element.embeddedImage && imagePositionGroup) {
@@ -6915,8 +7035,475 @@ ${pagesHtml}
                 <p>No submissions were graded for this assignment.</p>
             `;
         }
-        
+
         modal.style.display = 'flex';
+    }
+
+    // =====================================================================
+    // ❓ QUESTIONS FROM THE SCIENCE LEARNING PORTAL
+    //
+    // The teacher pins questions out of the Science Learning Portal's bank
+    // (polymathlc/cer) onto any shape; a student opening the mindmap taps the
+    // ❓ badge on the shape and answers them right there. All the reading and
+    // rendering lives in js/cer-questions.js; this is the UI over it.
+    //
+    // THE ELEMENT CARRIES REFERENCES, NEVER THE QUESTION. `element.questions`
+    // is a list of { id, ownerUid, title, topic, kind } — what the badge and
+    // the properties panel need offline, and nothing a student could read an
+    // answer out of. The card fetches the live document when it opens, so a
+    // question corrected in the portal is corrected on every mindmap at once.
+    // A cloned or submitted mindmap keeps the refs, which is what lets a
+    // student answer on their own copy of a published map.
+    //
+    // WHO MAY DO WHAT. Pinning and removing are the teacher's
+    // (FirebaseService.isAdmin, checked in the HANDLER — a hidden button is
+    // not a lock); opening and answering is everyone's, because the questions
+    // exist for the student. A multiple-choice answer is marked here and
+    // logged to the portal's own attempt log under the mode 'mindmap'; a
+    // written answer is typed and then compared against the teacher's model
+    // answer — this app has no marker and does not pretend to.
+    // =====================================================================
+    isCerAdmin() {
+        return typeof FirebaseService !== 'undefined' && !!(FirebaseService.isAdmin && FirebaseService.isAdmin());
+    }
+
+    cerReady() {
+        return typeof window.CerQuestions !== 'undefined' && typeof db !== 'undefined' && !!db;
+    }
+
+    cerModalOpen() {
+        const a = document.getElementById('cerPickModal');
+        const b = document.getElementById('cerQuestionModal');
+        return (a && a.style.display !== 'none' && a.style.display !== '') || (b && b.style.display !== 'none' && b.style.display !== '');
+    }
+
+    closeCerModals() {
+        const card = document.getElementById('cerQuestionModal');
+        const pick = document.getElementById('cerPickModal');
+        // The card sits on top of the picker (👁 preview), so Escape closes
+        // it first and the picker keeps its ticks.
+        if (card && card.style.display === 'flex') { card.style.display = 'none'; this._cer = null; return; }
+        if (pick && pick.style.display === 'flex') { pick.style.display = 'none'; }
+    }
+
+    // Replaces the list wholesale rather than mutating it: `duplicate()` copies
+    // an element with a spread, so two shapes can share ONE array, and a push
+    // onto it would pin the question to both.
+    setQuestionRefs(element, refs) {
+        const clean = CerQuestions.normaliseRefs(refs);
+        if (clean.length) element.questions = clean;
+        else delete element.questions;
+        this.saveState();
+        this.render();
+        this.updatePropertyPanel();
+    }
+
+    // The properties panel's own group. A student sees what is pinned and a
+    // ▶ button; the teacher also gets ✕ on each row and the attach button.
+    renderCerPropertyGroup(element) {
+        const group = document.getElementById('cerQuestionGroup');
+        if (!group) return;
+        const list = document.getElementById('elementCerList');
+        const tryBtn = document.getElementById('elementCerTry');
+        const attachBtn = document.getElementById('elementCerAttach');
+        const pinnable = element && element.type !== 'arrow' && element.type !== 'line' && this.cerReady();
+        if (!pinnable) { group.style.display = 'none'; return; }
+        const refs = this.getQuestionRefs(element);
+        const admin = this.isCerAdmin();
+        if (!refs.length && !admin) { group.style.display = 'none'; return; }
+        group.style.display = '';
+        const esc = CerQuestions.escapeHtml;
+        list.innerHTML = refs.length ? refs.map((r, i) => `
+            <div class="cer-row">
+                <button type="button" class="cer-row-open" data-cer-act="open" data-cer-index="${i}" title="Open this question">
+                    <span class="cer-row-kind">${r.kind === 'mcq' ? '🔘' : r.kind === 'open' ? '✍️' : '📖'}</span>
+                    <span class="cer-row-title">${esc(r.title || 'Untitled question')}</span>
+                    ${r.topic ? `<span class="cer-row-topic">${esc(r.topic)}</span>` : ''}
+                </button>
+                ${admin ? `<button type="button" class="cer-row-remove" data-cer-act="remove" data-cer-index="${i}" title="Take this question off the shape">✕</button>` : ''}
+            </div>`).join('') : '<p class="cer-empty">No question pinned to this shape yet.</p>';
+        tryBtn.style.display = refs.length ? '' : 'none';
+        tryBtn.textContent = refs.length > 1 ? `▶ Answer the ${refs.length} questions` : '▶ Answer the question';
+        attachBtn.style.display = admin ? '' : 'none';
+        attachBtn.disabled = refs.length >= CerQuestions.CER_MAX_PER_SHAPE;
+        attachBtn.title = attachBtn.disabled
+            ? `A shape holds at most ${CerQuestions.CER_MAX_PER_SHAPE} questions — more is a worksheet, which the portal is for.`
+            : 'Pick questions from the Science Learning Portal’s bank for this shape';
+    }
+
+    removeCerQuestion(element, idx) {
+        if (!this.isCerAdmin()) { alert('Only the teacher can change the questions on a shape.'); return; }
+        const refs = this.getQuestionRefs(element);
+        if (idx < 0 || idx >= refs.length) return;
+        refs.splice(idx, 1);
+        this.setQuestionRefs(element, refs);
+    }
+
+    // ---- the picker (teacher) ---------------------------------------------
+    setupCerQuestions() {
+        const pick = document.getElementById('cerPickModal');
+        const card = document.getElementById('cerQuestionModal');
+        if (!pick || !card) return;
+        this._cerPick = { bank: null, selected: new Set(), search: '', topic: '', loading: false, error: '' };
+        this._cer = null;
+
+        const closePick = () => { pick.style.display = 'none'; };
+        document.getElementById('closeCerPick').addEventListener('click', closePick);
+        document.getElementById('cancelCerPick').addEventListener('click', closePick);
+        pick.addEventListener('click', (e) => { if (e.target === pick) closePick(); });
+
+        const search = document.getElementById('cerPickSearch');
+        search.addEventListener('input', () => { this._cerPick.search = search.value; this.renderCerPicker(); });
+        const topic = document.getElementById('cerPickTopic');
+        topic.addEventListener('change', () => { this._cerPick.topic = topic.value; this.renderCerPicker(); });
+        document.getElementById('cerPickReload').addEventListener('click', () => this.loadCerBank(true));
+        document.getElementById('cerPickAttach').addEventListener('click', () => this.attachCerSelected());
+
+        const list = document.getElementById('cerPickList');
+        list.addEventListener('change', (e) => {
+            const box = e.target.closest('input[type="checkbox"][data-qid]');
+            if (!box) return;
+            if (box.checked) this._cerPick.selected.add(box.getAttribute('data-qid'));
+            else this._cerPick.selected.delete(box.getAttribute('data-qid'));
+            this.renderCerPickCount();
+        });
+        list.addEventListener('click', (e) => {
+            const eye = e.target.closest('button[data-cer-preview]');
+            if (!eye) return;
+            e.preventDefault();
+            this.previewCerQuestion(eye.getAttribute('data-cer-preview'));
+        });
+
+        // The card.
+        const closeCard = () => { card.style.display = 'none'; this._cer = null; };
+        document.getElementById('closeCerQuestion').addEventListener('click', closeCard);
+        card.addEventListener('click', (e) => { if (e.target === card) closeCard(); });
+        document.getElementById('cqPrev').addEventListener('click', () => this.cerNav(-1));
+        document.getElementById('cqNext').addEventListener('click', () => this.cerNav(1));
+        document.getElementById('cqCheck').addEventListener('click', () => this.cerCheck());
+        document.getElementById('cqReveal').addEventListener('click', () => this.cerReveal());
+        document.getElementById('cqBody').addEventListener('change', (e) => {
+            const radio = e.target.closest('input[type="radio"][name="cq_mcq"]');
+            if (!radio || !this._cer) return;
+            this._cer.picked = radio.value;
+            this.renderCerCardActions();
+        });
+        const portal = document.getElementById('cqPortalLink');
+        if (portal) portal.href = CerQuestions.CER_PORTAL_URL;
+    }
+
+    async openCerPicker() {
+        if (!this.isCerAdmin()) { alert('Only the teacher can pin questions from the Science Learning Portal.'); return; }
+        if (this.selectedElements.length !== 1) { alert('Select one shape first.'); return; }
+        if (!this.cerReady()) { alert('The question bank is unavailable — check that you are signed in.'); return; }
+        const element = this.selectedElements[0];
+        if (element.type === 'arrow' || element.type === 'line') return;
+        this._cerPick.selected = new Set();
+        this._cerPick.error = '';
+        const pick = document.getElementById('cerPickModal');
+        pick.style.display = 'flex';
+        this.renderCerPicker();
+        if (!this._cerPick.bank) await this.loadCerBank(false);
+        setTimeout(() => { const s = document.getElementById('cerPickSearch'); if (s) s.focus(); }, 50);
+    }
+
+    async loadCerBank(force) {
+        const st = this._cerPick;
+        st.loading = true; st.error = '';
+        this.renderCerPicker();
+        try {
+            const user = FirebaseService.getCurrentUser();
+            st.bank = await CerQuestions.loadBank(db, user && user.uid, !!force);
+            // Topics come off the bank itself, so the dropdown can never name a
+            // topic the bank does not hold.
+            const topicSel = document.getElementById('cerPickTopic');
+            const keep = st.topic;
+            topicSel.innerHTML = '<option value="">All topics</option>' + CerQuestions.topicsOf(st.bank.questions.map(x => x.sum))
+                .map(t => `<option value="${CerQuestions.escapeHtml(t.topic)}">${CerQuestions.escapeHtml(t.topic)} (${t.count})</option>`).join('');
+            topicSel.value = keep;
+            if (topicSel.value !== keep) { st.topic = ''; topicSel.value = ''; }
+        } catch (err) {
+            console.error('cer bank load', err);
+            st.error = /permission|insufficient/i.test(String(err && err.message || err))
+                ? 'The Science Learning Portal did not let this account read its question bank.'
+                : 'Could not load the question bank: ' + (err && err.message || err);
+        }
+        st.loading = false;
+        this.renderCerPicker();
+    }
+
+    renderCerPickCount() {
+        const n = this._cerPick.selected.size;
+        const count = document.getElementById('cerPickCount');
+        const attach = document.getElementById('cerPickAttach');
+        if (count) count.textContent = n ? `${n} selected` : '';
+        if (attach) attach.disabled = n === 0;
+    }
+
+    renderCerPicker() {
+        const st = this._cerPick;
+        const status = document.getElementById('cerPickStatus');
+        const list = document.getElementById('cerPickList');
+        const esc = CerQuestions.escapeHtml;
+        if (!status || !list) return;
+        const element = this.selectedElements[0];
+        const pinned = new Set(this.getQuestionRefs(element).map(r => r.id));
+        if (st.loading) {
+            status.textContent = 'Reading the Science Learning Portal’s question bank…';
+            list.innerHTML = '';
+            this.renderCerPickCount();
+            return;
+        }
+        if (st.error) {
+            status.textContent = st.error;
+            list.innerHTML = '';
+            this.renderCerPickCount();
+            return;
+        }
+        if (!st.bank) { status.textContent = ''; list.innerHTML = ''; return; }
+        const all = st.bank.questions.map(x => x.sum);
+        const shown = CerQuestions.search(all, st.search, st.topic);
+        const skipped = Object.keys(st.bank.skipped || {}).reduce((n, k) => n + st.bank.skipped[k], 0);
+        status.textContent = `${shown.length} of ${all.length} questions` +
+            (skipped ? ` · ${skipped} in the bank are not offered (held back, scheduled, out of syllabus or unfinished)` : '') +
+            (pinned.size ? ` · ${pinned.size} already on this shape` : '');
+        if (!shown.length) {
+            list.innerHTML = '<p class="cq-hint">Nothing matches. Try fewer words, or another topic.</p>';
+            this.renderCerPickCount();
+            return;
+        }
+        // Two hundred rows is a scroll a teacher can work; two thousand is a
+        // page that stalls. The search box is how the rest are reached.
+        const LIMIT = 200;
+        list.innerHTML = shown.slice(0, LIMIT).map(s => {
+            const already = pinned.has(s.id);
+            const checked = st.selected.has(s.id);
+            const kindIcon = s.kind === 'mcq' ? '🔘' : s.kind === 'open' ? '✍️' : '📖';
+            return `<label class="cq-row${already ? ' cq-row-pinned' : ''}">
+                <input type="checkbox" data-qid="${esc(s.id)}"${checked ? ' checked' : ''}${already ? ' disabled' : ''}>
+                <span class="cq-row-main">
+                    <span class="cq-row-title">${esc(s.title)}</span>
+                    <span class="cq-row-meta">${kindIcon} ${esc(CerQuestions.kindLabel(s.kind))}${s.topic ? ' · ' + esc(s.topic) : ''}${s.hasPicture ? ' · 🖼' : ''}${already ? ' · already on this shape' : ''}</span>
+                    ${s.stem ? `<span class="cq-row-stem">${esc(s.stem)}</span>` : ''}
+                </span>
+                <button type="button" class="cq-row-eye" data-cer-preview="${esc(s.id)}" title="Preview this question">👁</button>
+            </label>`;
+        }).join('') + (shown.length > LIMIT ? `<p class="cq-hint">Showing the first ${LIMIT}. Search to narrow the list.</p>` : '');
+        this.renderCerPickCount();
+    }
+
+    attachCerSelected() {
+        if (!this.isCerAdmin()) { alert('Only the teacher can pin questions.'); return; }
+        if (this.selectedElements.length !== 1 || !this._cerPick.bank) return;
+        const element = this.selectedElements[0];
+        const refs = this.getQuestionRefs(element);
+        const have = new Set(refs.map(r => r.id));
+        const ownerUid = this._cerPick.bank.ownerUid;
+        let added = 0;
+        this._cerPick.bank.questions.forEach(x => {
+            if (!this._cerPick.selected.has(x.q.id) || have.has(x.q.id)) return;
+            if (refs.length >= CerQuestions.CER_MAX_PER_SHAPE) return;
+            refs.push(CerQuestions.refFromQuestion(x.q, ownerUid));
+            added++;
+        });
+        this._cerPick.selected = new Set();
+        document.getElementById('cerPickModal').style.display = 'none';
+        if (!added) return;
+        this.setQuestionRefs(element, refs);
+        const total = this.getQuestionRefs(element).length;
+        alert(`❓ ${added} question${added === 1 ? '' : 's'} pinned to this shape (${total} in all).\nStudents tap the ❓ badge on the shape to answer. Save the mindmap to keep it.`);
+    }
+
+    // 👁 in the picker: the same card, over the picker, showing the teacher
+    // the answer straight away — it is their own bank.
+    async previewCerQuestion(qid) {
+        if (!this._cerPick.bank) return;
+        const hit = this._cerPick.bank.questions.find(x => x.q.id === qid);
+        if (!hit) return;
+        const ref = CerQuestions.refFromQuestion(hit.q, this._cerPick.bank.ownerUid);
+        this._cer = { element: null, refs: [ref], index: 0, q: hit.q, picked: '', marked: null, revealed: true, preview: true, openedAt: Date.now(), logged: false, loading: false, error: '' };
+        document.getElementById('cerQuestionModal').style.display = 'flex';
+        this.renderCerCard();
+    }
+
+    // ---- the card (everyone) ------------------------------------------------
+    async openCerQuestion(element, index) {
+        if (!this.cerReady()) { alert('The question could not be opened — check that you are signed in.'); return; }
+        const refs = this.getQuestionRefs(element);
+        if (!refs.length) return;
+        const i = Math.max(0, Math.min(refs.length - 1, index | 0));
+        this._cer = { element, refs, index: i, q: null, picked: '', marked: null, revealed: false, preview: false, openedAt: Date.now(), logged: false, loading: true, error: '' };
+        document.getElementById('cerQuestionModal').style.display = 'flex';
+        this.renderCerCard();
+        await this.loadCerCardQuestion();
+    }
+
+    async loadCerCardQuestion() {
+        const st = this._cer;
+        if (!st) return;
+        const ref = st.refs[st.index];
+        st.loading = true; st.error = ''; st.q = null; st.picked = ''; st.marked = null; st.revealed = false; st.logged = false; st.openedAt = Date.now();
+        this.renderCerCard();
+        try {
+            const user = FirebaseService.getCurrentUser();
+            const q = await CerQuestions.loadQuestion(db, ref, user && user.uid);
+            // The student moved on while the read was in flight.
+            if (this._cer !== st || st.refs[st.index] !== ref) return;
+            if (!q) st.error = 'This question is no longer in the Science Learning Portal’s bank.';
+            else {
+                const v = CerQuestions.usable(q);
+                // A question the portal itself would not serve today is not
+                // served here either — held back for a paper, or dated ahead.
+                // The teacher still sees it, because it is theirs.
+                if (!v.ok && !this.isCerAdmin() && (v.why === 'held-back' || v.why === 'scheduled')) {
+                    st.error = 'This question is not released yet. Come back after your teacher opens it.';
+                } else st.q = q;
+            }
+        } catch (err) {
+            console.error('cer question load', err);
+            st.error = /permission|insufficient/i.test(String(err && err.message || err))
+                ? 'Sign in with your Polymath account to open this question.'
+                : 'Could not load the question: ' + (err && err.message || err);
+        }
+        st.loading = false;
+        this.renderCerCard();
+    }
+
+    cerNav(delta) {
+        const st = this._cer;
+        if (!st || st.preview) return;
+        const next = st.index + delta;
+        if (next < 0 || next >= st.refs.length) return;
+        st.index = next;
+        this.loadCerCardQuestion();
+    }
+
+    renderCerCard() {
+        const st = this._cer;
+        if (!st) return;
+        const esc = CerQuestions.escapeHtml;
+        const ref = st.refs[st.index] || {};
+        const title = document.getElementById('cqTitle');
+        const meta = document.getElementById('cqMeta');
+        const body = document.getElementById('cqBody');
+        const answerArea = document.getElementById('cqAnswerArea');
+        const result = document.getElementById('cqResult');
+        const nav = document.getElementById('cqNav');
+        const shapeText = st.element && st.element.text ? CerQuestions.plainText(st.element.text) : '';
+
+        title.textContent = (st.q && CerQuestions.plainText(st.q.title)) || ref.title || 'Question';
+        const kind = st.q ? CerQuestions.kindOf(st.q) : ref.kind;
+        meta.innerHTML = [
+            st.q && st.q.topic ? esc(st.q.topic) : (ref.topic ? esc(ref.topic) : ''),
+            esc(CerQuestions.kindLabel(kind)),
+            shapeText ? 'from “' + esc(shapeText.slice(0, 40)) + (shapeText.length > 40 ? '…' : '') + '”' : '',
+            st.preview ? 'preview — answers shown' : ''
+        ].filter(Boolean).join(' · ');
+        nav.textContent = st.refs.length > 1 ? `${st.index + 1} of ${st.refs.length}` : '';
+        document.getElementById('cqPrev').style.display = st.refs.length > 1 && !st.preview ? '' : 'none';
+        document.getElementById('cqNext').style.display = st.refs.length > 1 && !st.preview ? '' : 'none';
+        document.getElementById('cqPrev').disabled = st.index === 0;
+        document.getElementById('cqNext').disabled = st.index >= st.refs.length - 1;
+
+        if (st.loading) {
+            body.innerHTML = '<p class="cq-hint">Loading the question…</p>';
+            answerArea.innerHTML = '';
+            result.style.display = 'none';
+            this.renderCerCardActions();
+            return;
+        }
+        if (st.error || !st.q) {
+            body.innerHTML = `<p class="cq-hint cq-error">${esc(st.error || 'The question could not be shown.')}</p>`;
+            answerArea.innerHTML = '';
+            result.style.display = 'none';
+            this.renderCerCardActions();
+            return;
+        }
+
+        body.innerHTML = CerQuestions.renderBlocks(st.q, { revealed: st.revealed, picked: st.picked, marked: st.marked });
+
+        // The written-answer box: the student's own words, kept across a
+        // re-render so pressing "Show model answer" does not wipe them.
+        if (kind === 'open') {
+            const prev = document.getElementById('cqWritten');
+            const keep = prev ? prev.value : (st.written || '');
+            answerArea.innerHTML = `<label class="cq-written-label" for="cqWritten">Your answer</label>
+                <textarea id="cqWritten" class="cq-written" rows="3" placeholder="Write your answer here, then compare it with the model answer.">${esc(keep)}</textarea>`;
+            const ta = document.getElementById('cqWritten');
+            ta.addEventListener('input', () => { if (this._cer) this._cer.written = ta.value; });
+            if (st.revealed) ta.readOnly = true;
+        } else {
+            answerArea.innerHTML = '';
+        }
+
+        if (st.marked) {
+            result.style.display = '';
+            result.className = 'cq-result ' + (st.marked.correct ? 'cq-result-right' : 'cq-result-wrong');
+            result.innerHTML = st.marked.correct
+                ? '✅ Correct! Well done.'
+                : `❌ Not quite. The correct answer is <b>${st.marked.correctIndex + 1}.</b> ${esc(st.marked.correctText)}`;
+        } else if (st.revealed && kind === 'open') {
+            result.style.display = '';
+            result.className = 'cq-result cq-result-neutral';
+            result.textContent = 'Compare your answer with the model answer above. Did you make the same points?';
+        } else {
+            result.style.display = 'none';
+        }
+        this.renderCerCardActions();
+    }
+
+    renderCerCardActions() {
+        const st = this._cer;
+        const check = document.getElementById('cqCheck');
+        const reveal = document.getElementById('cqReveal');
+        if (!check || !reveal) return;
+        if (!st || st.loading || st.error || !st.q) { check.style.display = 'none'; reveal.style.display = 'none'; return; }
+        const kind = CerQuestions.kindOf(st.q);
+        if (kind === 'mcq') {
+            check.style.display = st.marked ? 'none' : '';
+            check.disabled = !st.picked;
+            reveal.style.display = 'none';
+        } else if (kind === 'open') {
+            check.style.display = 'none';
+            reveal.textContent = 'Show model answer';
+            reveal.style.display = st.revealed ? 'none' : '';
+            reveal.disabled = false;
+        } else {
+            // Nothing to mark and no model answer — but an explanation the
+            // teacher wrote is still worth reading once the student has read
+            // the question, so it is offered rather than hidden for ever.
+            check.style.display = 'none';
+            reveal.textContent = 'Show explanation';
+            reveal.style.display = (!st.revealed && CerQuestions.hasExplanation(st.q)) ? '' : 'none';
+            reveal.disabled = false;
+        }
+    }
+
+    cerCheck() {
+        const st = this._cer;
+        if (!st || !st.q || !st.picked || st.marked) return;
+        const verdict = CerQuestions.markMcq(st.q, st.picked);
+        if (!verdict) return;
+        st.marked = verdict;
+        st.revealed = true;
+        // Logged ONCE per opening, and never for the teacher's own preview or
+        // their own account: the attempt log is a record of students' work.
+        if (!st.logged && !st.preview) {
+            st.logged = true;
+            try {
+                CerQuestions.logAttempt(db, FirebaseService.getCurrentUser(), st.q, verdict.correct, Date.now() - st.openedAt, this.isCerAdmin());
+            } catch (e) { console.warn('attempt log', e); }
+        }
+        this.renderCerCard();
+    }
+
+    cerReveal() {
+        const st = this._cer;
+        if (!st || !st.q) return;
+        const ta = document.getElementById('cqWritten');
+        if (ta) st.written = ta.value;
+        st.revealed = true;
+        this.renderCerCard();
     }
 }
 
