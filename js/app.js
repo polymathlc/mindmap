@@ -4,7 +4,7 @@
 // The build that is running. It renders in the toolbar (#versionTag) so the
 // user can check the number on screen against the number reported in chat and
 // know whether a deploy went through. Bump it on EVERY change.
-const APP_VERSION = 'v1.1.0';
+const APP_VERSION = 'v1.2.0';
 
 class MindmapApp {
     constructor() {
@@ -7156,6 +7156,21 @@ ${pagesHtml}
         search.addEventListener('input', () => { this._cerPick.search = search.value; this.renderCerPicker(); });
         const topic = document.getElementById('cerPickTopic');
         topic.addEventListener('change', () => { this._cerPick.topic = topic.value; this.renderCerPicker(); });
+        // The tag row: one tap on a tag types it into the search box, so a
+        // teacher does not have to remember what the bank's tags are called.
+        // Tapping the tag already typed clears it. The row is rebuilt on
+        // every render, so the listener is delegated rather than per chip.
+        const tagRow = document.getElementById('cerPickTags');
+        if (tagRow) tagRow.addEventListener('click', (e) => {
+            const chip = e.target.closest('button[data-cer-tag]');
+            if (!chip) return;
+            e.preventDefault();
+            const tag = chip.getAttribute('data-cer-tag') || '';
+            const current = String(this._cerPick.search || '').trim().toLowerCase();
+            this._cerPick.search = current === tag.toLowerCase() ? '' : tag;
+            search.value = this._cerPick.search;
+            this.renderCerPicker();
+        });
         document.getElementById('cerPickReload').addEventListener('click', () => this.loadCerBank(true));
         document.getElementById('cerPickAttach').addEventListener('click', () => this.attachCerSelected());
 
@@ -7263,6 +7278,7 @@ ${pagesHtml}
         if (!st.bank) { status.textContent = ''; list.innerHTML = ''; return; }
         const all = st.bank.questions.map(x => x.sum);
         const shown = CerQuestions.search(all, st.search, st.topic);
+        this.renderCerPickTags(all);
         const skipped = Object.keys(st.bank.skipped || {}).reduce((n, k) => n + st.bank.skipped[k], 0);
         status.textContent = `${shown.length} of ${all.length} questions` +
             (skipped ? ` · ${skipped} in the bank are not offered (held back, scheduled, out of syllabus or unfinished)` : '') +
@@ -7285,11 +7301,35 @@ ${pagesHtml}
                     <span class="cq-row-title">${esc(s.title)}</span>
                     <span class="cq-row-meta">${kindIcon} ${esc(CerQuestions.kindLabel(s.kind))}${s.topic ? ' · ' + esc(s.topic) : ''}${s.hasPicture ? ' · 🖼' : ''}${already ? ' · already on this shape' : ''}</span>
                     ${s.stem ? `<span class="cq-row-stem">${esc(s.stem)}</span>` : ''}
+                    ${s.tags && s.tags.length ? `<span class="cq-row-tags">${s.tags.map(t => `<span class="cq-tag">${esc(t)}</span>`).join('')}</span>` : ''}
                 </span>
                 <button type="button" class="cq-row-eye" data-cer-preview="${esc(s.id)}" title="Preview this question">👁</button>
             </label>`;
         }).join('') + (shown.length > LIMIT ? `<p class="cq-hint">Showing the first ${LIMIT}. Search to narrow the list.</p>` : '');
         this.renderCerPickCount();
+    }
+
+    // The tags the bank really uses, most-used first, as tappable chips under
+    // the search box. A tag search is only useful if the teacher can see what
+    // the tags ARE — the portal's tags are free text, typed on the question,
+    // and nobody remembers forty of them. The chip matching the search box
+    // is lit. Capped: a bank of a thousand questions can carry hundreds of
+    // tags, and a wall of chips is a search box nobody can find.
+    renderCerPickTags(all) {
+        const row = document.getElementById('cerPickTags');
+        if (!row) return;
+        const esc = CerQuestions.escapeHtml;
+        const LIMIT = 40;
+        const tags = CerQuestions.tagsIn(all || []);
+        if (!tags.length) { row.innerHTML = ''; row.style.display = 'none'; return; }
+        const current = String(this._cerPick.search || '').trim().toLowerCase();
+        row.style.display = '';
+        row.innerHTML = '<span class="cq-tags-label" title="Tags the portal’s teacher put on these questions">🏷</span>' +
+            tags.slice(0, LIMIT).map(t => {
+                const on = current && current === t.tag.toLowerCase();
+                return `<button type="button" class="cq-tag cq-tag-btn${on ? ' on' : ''}" data-cer-tag="${esc(t.tag)}" title="${on ? 'Clear this tag' : 'Show every question tagged ' + esc(t.tag)}">${esc(t.tag)}<span class="cq-tag-n">${t.count}</span></button>`;
+            }).join('') +
+            (tags.length > LIMIT ? `<span class="cq-tags-more">+${tags.length - LIMIT} more — type a tag to search it</span>` : '');
     }
 
     attachCerSelected() {

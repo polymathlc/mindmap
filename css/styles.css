@@ -2313,6 +2313,41 @@ body {
 .cq-row-title { font-size: 14px; font-weight: 500; color: #222; line-height: 1.4; }
 .cq-row-meta { font-size: 11.5px; color: #6c5ce7; }
 .cq-row-stem { font-size: 12.5px; color: #666; line-height: 1.5; }
+.cq-row-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 2px; }
+.cq-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    line-height: 1;
+    padding: 4px 8px;
+    border-radius: 999px;
+    background: #f1f0fb;
+    color: #4c3fb8;
+    border: 1px solid #e0dcf7;
+    white-space: nowrap;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.cq-tags {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin: 0 0 12px;
+    padding: 10px 12px;
+    background: #faf9ff;
+    border: 1px solid #ece9fb;
+    border-radius: 10px;
+}
+.cq-tags-label { font-size: 13px; margin-right: 2px; }
+.cq-tag-btn { cursor: pointer; font-family: inherit; }
+.cq-tag-btn:hover { background: #e6e2fb; border-color: #c9c1f3; }
+.cq-tag-btn.on { background: #6c5ce7; border-color: #6c5ce7; color: #fff; }
+.cq-tag-n { font-size: 10px; opacity: 0.7; }
+.cq-tag-btn.on .cq-tag-n { opacity: 0.85; }
+.cq-tags-more { font-size: 11.5px; color: #888; }
 .cq-row-eye {
     flex: 0 0 auto;
     background: #fff;

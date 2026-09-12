@@ -7,6 +7,24 @@ for the landing page and `app.html` for the canvas.
 This file is the feature log, newest version first. The version running is shown in the
 toolbar.
 
+## v1.2.0 — 🏷 The question picker searches the portal's TAGS
+
+Typing **expansion** into the ❓ picker's search box now finds every question the Science
+Learning Portal's teacher has **tagged** expansion, not only the ones whose title, topic or
+wording happen to say the word. A question about a jar lid loosening under hot water is
+about expansion and never says so in its text — the tag is where that lives, and the picker
+was not reading it.
+
+- The search box reads the title, the topic, the **tags** and the wording. Every word typed
+  still has to match somewhere, and the topic dropdown still narrows on top.
+- A **tag row** sits under the search box: the tags the bank really uses, most-used first,
+  each with how many questions wear it. Tap one and it is typed into the search box for you;
+  tap it again to clear it. Tags past the first forty are reached by typing them.
+- Every row in the picker now shows its tags as small chips, so what a question is filed
+  under is visible before it is pinned.
+- Tags are read exactly the way the portal reads them — one tag however it was capitalised,
+  a bare number ignored — so a search here and a search there agree.
+
 ## v1.1.0 — ❓ Questions from the Science Learning Portal, pinned to a shape
 
 A shape on the mindmap can now carry a question — or several — out of the Science Learning

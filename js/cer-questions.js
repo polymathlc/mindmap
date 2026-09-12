@@ -201,6 +201,34 @@
         return kind === 'mcq' ? 'Multiple choice' : kind === 'open' ? 'Written answer' : 'Read only';
     }
 
+    // ---- the tags a question wears -----------------------------------------
+    // The portal files a question under free-text tags (`tags: string[]`) as
+    // well as its topic — "expansion", "elastic spring force" — and searching
+    // "expansion" in the portal finds everything tagged with it. The picker
+    // here reads the same field the same way, or a tag the teacher relies on
+    // in one app finds nothing in the other. This mirrors the portal's own
+    // `qTagList`: kept case-as-typed for display, compared case-insensitively
+    // (one tag, however it was capitalised), a bare number dropped (a
+    // question number is not a concept), each tag clipped and the list capped
+    // so a document with a runaway tag list cannot balloon a picker row.
+    const TAG_MAX_LEN = 48;
+    const TAG_MAX_COUNT = 24;
+    function tagsOf(q) {
+        const raw = (q && Array.isArray(q.tags)) ? q.tags : [];
+        const out = [];
+        const seen = {};
+        raw.forEach(t => {
+            const s = String(t == null ? '' : t).replace(/\s+/g, ' ').trim().slice(0, TAG_MAX_LEN);
+            if (!s) return;
+            if (/^\d+$/.test(s)) return;
+            const k = s.toLowerCase();
+            if (seen[k]) return;
+            seen[k] = true;
+            out.push(s);
+        });
+        return out.slice(0, TAG_MAX_COUNT);
+    }
+
     // ---- the reference an element carries ---------------------------------
     function refFromQuestion(q, ownerUid) {
         return {
@@ -432,6 +460,7 @@
             title: plainText(q.title || '') || stem.slice(0, 60) || 'Untitled question',
             topic: String(q.topic || ''),
             topic2: String(q.topic2 || ''),
+            tags: tagsOf(q),
             stem: stem.length > 160 ? stem.slice(0, 157).trimEnd() + '…' : stem,
             kind: kindOf(q),
             hasPicture: (q.blocks || []).some(b => b && b.type === 'image' && (b.url || b.src))
@@ -439,17 +468,45 @@
     }
 
     // The picker's filter: every word typed has to match somewhere in the
-    // title, the topic or the wording (an OR returns half the bank), and a
-    // topic chosen from the dropdown narrows on top of that.
+    // title, the topic, the TAGS or the wording (an OR returns half the
+    // bank), and a topic chosen from the dropdown narrows on top of that.
+    //
+    // The tags are the half that matters most for a mindmap: a shape labelled
+    // "Expansion" wants every question ABOUT expansion, and the portal's
+    // teacher files those under a tag far more reliably than the wording
+    // happens to say the word — a question about a metal lid loosening under
+    // hot water never says "expansion" anywhere in its text. So the haystack
+    // reads `searchText(s)`, the ONE place a summary becomes searchable text,
+    // and the tags are in it beside the title and the topic.
+    function searchText(s) {
+        if (!s) return '';
+        const tags = Array.isArray(s.tags) ? s.tags.join(' ') : '';
+        return (s.title + ' ' + s.topic + ' ' + s.topic2 + ' ' + tags + ' ' + s.stem).toLowerCase();
+    }
     function search(list, term, topic) {
         const words = String(term || '').toLowerCase().split(/\s+/).filter(Boolean);
         const wantTopic = String(topic || '');
         return (list || []).filter(s => {
             if (wantTopic && s.topic !== wantTopic && s.topic2 !== wantTopic) return false;
             if (!words.length) return true;
-            const hay = (s.title + ' ' + s.topic + ' ' + s.topic2 + ' ' + s.stem).toLowerCase();
+            const hay = searchText(s);
             return words.every(w => hay.indexOf(w) >= 0);
         });
+    }
+    // Every tag on the list with how many questions wear it, for a tag row
+    // the picker can offer beside the topic dropdown. Sorted by count so the
+    // tags a bank really uses come first, then by name so the order is stable.
+    function tagsIn(list) {
+        const seen = {};
+        const label = {};
+        (list || []).forEach(s => (Array.isArray(s.tags) ? s.tags : []).forEach(t => {
+            const k = String(t).toLowerCase();
+            if (!label[k]) label[k] = String(t);
+            seen[k] = (seen[k] || 0) + 1;
+        }));
+        return Object.keys(seen)
+            .sort((a, b) => (seen[b] - seen[a]) || a.localeCompare(b))
+            .map(k => ({ tag: label[k], count: seen[k] }));
     }
 
     function topicsOf(list) {
@@ -545,7 +602,7 @@
         mcqBlocks, hasAnswerBlock, hasExplanation, kindOf, kindLabel,
         refFromQuestion, normaliseRefs,
         fbParse, fbSegments, tableRows,
-        renderBlocks, markMcq, summary, search, topicsOf,
+        renderBlocks, markMcq, summary, search, searchText, tagsOf, tagsIn, topicsOf,
         resolveOwner, loadBank, loadQuestion, logAttempt, forgetCache
     };
     if (typeof window !== 'undefined') window.CerQuestions = api;
